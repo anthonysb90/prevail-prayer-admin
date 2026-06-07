@@ -22,26 +22,24 @@ async function getStats() {
 async function getRecentActivity() {
   const supabase = createClient();
   const [prayers, devotionList] = await Promise.all([
-    supabase
-      .from("prayer_requests")
-      .select("id, title, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("devotions")
-      .select("id, title, published_at, is_published")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    supabase.from("prayer_requests").select("id, title, status, created_at").order("created_at", { ascending: false }).limit(5),
+    supabase.from("devotions").select("id, title, published_at, is_published").order("created_at", { ascending: false }).limit(5),
   ]);
   return { prayers: prayers.data ?? [], devotions: devotionList.data ?? [] };
 }
 
 const STAT_CARDS = [
-  { label: "Total Users", key: "users", icon: Users, color: "bg-blue-50 text-blue-600" },
-  { label: "Active Prayers", key: "activePrayers", icon: BookOpen, color: "bg-amber-50 text-amber-600" },
-  { label: "Answered Prayers", key: "answeredPrayers", icon: Heart, color: "bg-green-50 text-green-600" },
-  { label: "Prayer Sessions", key: "sessions", icon: Timer, color: "bg-purple-50 text-purple-600" },
+  { label: "Total Members", key: "users", icon: Users },
+  { label: "Active Prayers", key: "activePrayers", icon: BookOpen },
+  { label: "Answered Prayers", key: "answeredPrayers", icon: Heart },
+  { label: "Prayer Sessions", key: "sessions", icon: Timer },
 ] as const;
+
+function statusPill(status: string) {
+  if (status === "answered") return "bg-ok/15 text-ok";
+  if (status === "ongoing") return "bg-brand-soft text-brand-deep";
+  return "bg-brand-soft text-brand";
+}
 
 export default async function DashboardPage() {
   const [stats, activity] = await Promise.all([getStats(), getRecentActivity()]);
@@ -49,60 +47,52 @@ export default async function DashboardPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-charcoal-900">Dashboard</h1>
-        <p className="text-charcoal-400 text-sm mt-1">Overview of Prevail Prayer activity</p>
+        <h1 className="text-3xl font-serif text-tone">Overview</h1>
+        <p className="text-tone-faint text-sm mt-1">A look at Prevail Prayer activity</p>
       </div>
 
-      {/* Stats grid */}
+      {/* KPI grid */}
       <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
-        {STAT_CARDS.map(({ label, key, icon: Icon, color }) => (
-          <div key={key} className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${color}`}>
+        {STAT_CARDS.map(({ label, key, icon: Icon }) => (
+          <div key={key} className="bg-white rounded-card p-5 border border-line shadow-card">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-brand-soft text-brand">
               <Icon size={20} />
             </div>
-            <p className="text-3xl font-bold text-charcoal-900">{stats[key].toLocaleString()}</p>
-            <p className="text-charcoal-400 text-sm mt-1">{label}</p>
+            <p className="text-3xl font-serif text-tone">{stats[key].toLocaleString()}</p>
+            <p className="text-tone-faint text-sm mt-1">{label}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent prayers */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h2 className="font-semibold text-charcoal-900 mb-4">Recent Prayer Requests</h2>
-          <div className="space-y-3">
-            {activity.prayers.length === 0 && (
-              <p className="text-charcoal-400 text-sm">No prayer requests yet.</p>
-            )}
+        <div className="bg-white rounded-card p-6 border border-line shadow-card">
+          <h2 className="font-serif text-lg text-tone mb-4">Recent Prayer Requests</h2>
+          <div className="space-y-1">
+            {activity.prayers.length === 0 && <p className="text-tone-faint text-sm">No prayer requests yet.</p>}
             {activity.prayers.map((p) => (
-              <div key={p.id} className="flex items-center justify-between py-2 border-b border-cream-100 last:border-0">
-                <p className="text-sm text-charcoal-900 truncate flex-1 mr-3">{p.title}</p>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  p.status === "answered" ? "bg-green-100 text-green-700" :
-                  p.status === "ongoing"  ? "bg-purple-100 text-purple-700" :
-                  "bg-blue-100 text-blue-700"
-                }`}>{p.status}</span>
+              <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-line last:border-0">
+                <p className="text-sm text-tone truncate flex-1 mr-3">{p.title}</p>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusPill(p.status)}`}>{p.status}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Recent devotions */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-card p-6 border border-line shadow-card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-charcoal-900">Recent Devotions</h2>
-            <span className="text-xs text-charcoal-400">{stats.devotions} published</span>
+            <h2 className="font-serif text-lg text-tone">Recent Devotions</h2>
+            <span className="text-xs text-tone-faint">{stats.devotions} published</span>
           </div>
-          <div className="space-y-3">
-            {activity.devotions.length === 0 && (
-              <p className="text-charcoal-400 text-sm">No devotions yet.</p>
-            )}
+          <div className="space-y-1">
+            {activity.devotions.length === 0 && <p className="text-tone-faint text-sm">No devotions yet.</p>}
             {activity.devotions.map((d) => (
-              <div key={d.id} className="flex items-center justify-between py-2 border-b border-cream-100 last:border-0">
-                <p className="text-sm text-charcoal-900 truncate flex-1 mr-3">{d.title}</p>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  d.is_published ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                }`}>{d.is_published ? "Published" : "Draft"}</span>
+              <div key={d.id} className="flex items-center justify-between py-2.5 border-b border-line last:border-0">
+                <p className="text-sm text-tone truncate flex-1 mr-3">{d.title}</p>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${d.is_published ? "bg-ok/15 text-ok" : "bg-line text-tone-faint"}`}>
+                  {d.is_published ? "Published" : "Draft"}
+                </span>
               </div>
             ))}
           </div>

@@ -2,19 +2,26 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, BookOpen, Library, Music2,
-  Bell, Users, LogOut, BookMarked,
+  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV = [
-  { href: "/",              label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/devotions",     label: "Devotions",    icon: BookOpen },
-  { href: "/scripture",     label: "Scripture",    icon: Library },
-  { href: "/music",         label: "Music",        icon: Music2 },
-  { href: "/notifications", label: "Notifications",icon: Bell },
-  { href: "/users",         label: "Users",        icon: Users },
+  { href: "/", label: "Overview", icon: LayoutGrid },
+  { href: "/devotions", label: "Devotions", icon: BookOpen },
+  { href: "/scripture", label: "Scripture", icon: Quote },
+  { href: "/music", label: "Music", icon: Music2 },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/users", label: "Users", icon: Users },
 ];
+
+function CrossMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M10 3h4v5h5v4h-5v9h-4v-9H5V8h5V3Z" />
+    </svg>
+  );
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -28,19 +35,19 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-charcoal-900 flex flex-col">
-      {/* Logo */}
+    <aside className="fixed left-0 top-0 h-full w-64 bg-ink flex flex-col">
       <div className="px-6 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center text-lg">🙏</div>
+          <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center text-white">
+            <CrossMark />
+          </div>
           <div>
-            <p className="text-white font-semibold text-sm leading-none">Prevail Prayer</p>
-            <p className="text-white/40 text-xs mt-0.5">Admin Panel</p>
+            <p className="text-white font-serif text-base leading-none">Prevail</p>
+            <p className="text-white/40 text-xs mt-1">Admin</p>
           </div>
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -48,9 +55,7 @@ export default function Sidebar() {
             <Link
               key={href} href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                active
-                  ? "bg-amber-400 text-white font-semibold"
-                  : "text-white/60 hover:text-white hover:bg-white/10"
+                active ? "bg-brand text-white font-semibold" : "text-white/55 hover:text-white hover:bg-white/10"
               }`}
             >
               <Icon size={18} />
@@ -60,11 +65,19 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Sign out */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t border-white/10 space-y-1">
+        <Link
+          href="/settings"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+            pathname.startsWith("/settings") ? "bg-brand text-white font-semibold" : "text-white/55 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Settings size={18} />
+          Settings
+        </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/55 hover:text-white hover:bg-white/10 transition-colors"
         >
           <LogOut size={18} />
           Sign Out
