@@ -60,7 +60,7 @@ export default function ScripturePage() {
       <div className="flex gap-2 mb-6 flex-wrap">
         {TOPICS.map((t) => (
           <button key={t} onClick={() => setTopic(t)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${topic === t ? "bg-charcoal-900 text-white" : "bg-white text-tone-muted hover:bg-cream-200"}`}>
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${topic === t ? "bg-brand text-white" : "bg-white text-tone-muted hover:bg-page"}`}>
             {t}
           </button>
         ))}

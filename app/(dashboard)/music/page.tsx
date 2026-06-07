@@ -74,8 +74,8 @@ export default function MusicPage() {
           </div>
         ) : tracks.map((t) => (
           <div key={t.id} className="bg-white rounded-card p-5 shadow-card flex items-center gap-4">
-            <div className="w-10 h-10 bg-charcoal-900 rounded-xl flex items-center justify-center shrink-0">
-              <Music size={18} className="text-amber-400" />
+            <div className="w-10 h-10 bg-ink rounded-xl flex items-center justify-center shrink-0">
+              <Music size={18} className="text-brand-ondark" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-tone text-sm truncate">{t.title}</p>

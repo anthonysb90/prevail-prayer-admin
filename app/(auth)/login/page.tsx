@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <div className="w-16 h-16 bg-brand rounded-card flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">🙏</span>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" className="text-white"><path d="M10 3h4v5h5v4h-5v9h-4v-9H5V8h5V3Z"/></svg>
           </div>
           <h1 className="text-3xl font-serif text-tone">Prevail Prayer</h1>
           <p className="text-tone-faint text-sm mt-1">Admin Panel</p>
