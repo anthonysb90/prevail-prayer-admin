@@ -38,58 +38,58 @@ export default function MusicPage() {
     setTracks((t) => t.map((x) => x.id === track.id ? { ...x, is_available: !x.is_available } : x));
   };
 
-  const inputClass = "w-full bg-cream-50 border border-cream-200 rounded-xl px-4 py-3 text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm";
+  const inputClass = "w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand text-sm";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-charcoal-900">Music Tracks</h1>
-          <p className="text-charcoal-400 text-sm mt-1">{tracks.length} tracks · used in Prayer Timer</p>
+          <h1 className="text-3xl font-serif text-tone">Music Tracks</h1>
+          <p className="text-tone-faint text-sm mt-1">{tracks.length} tracks · used in Prayer Timer</p>
         </div>
-        <button onClick={() => setAdding(true)} className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
+        <button onClick={() => setAdding(true)} className="flex items-center gap-2 bg-brand hover:bg-brand-deep text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
           <Plus size={16} /> Add Track
         </button>
       </div>
 
       {adding && (
-        <div className="bg-white rounded-2xl p-5 shadow-sm mb-6 space-y-3">
-          <h3 className="font-semibold text-sm text-charcoal-900">New Track</h3>
+        <div className="bg-white rounded-card p-5 shadow-card mb-6 space-y-3">
+          <h3 className="font-semibold text-sm text-tone">New Track</h3>
           <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className={inputClass} placeholder="Track title" />
           <input type="text" value={newArtist} onChange={(e) => setNewArtist(e.target.value)} className={inputClass} placeholder="Artist (optional)" />
           <input type="url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} className={inputClass} placeholder="Supabase Storage URL (optional — add after upload)" />
-          <p className="text-xs text-charcoal-400">Upload the .mp3 file to Supabase Storage first, then paste the public URL here.</p>
+          <p className="text-xs text-tone-faint">Upload the .mp3 file to Supabase Storage first, then paste the public URL here.</p>
           <div className="flex gap-3">
-            <button onClick={handleAdd} className="bg-amber-400 hover:bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl">Add Track</button>
-            <button onClick={() => setAdding(false)} className="text-charcoal-400 text-sm hover:text-charcoal-600">Cancel</button>
+            <button onClick={handleAdd} className="bg-brand hover:bg-brand-deep text-white text-sm font-semibold px-4 py-2 rounded-xl">Add Track</button>
+            <button onClick={() => setAdding(false)} className="text-tone-faint text-sm hover:text-tone-muted">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="space-y-3">
-        {loading ? <p className="text-charcoal-400 text-sm">Loading...</p> : tracks.length === 0 ? (
-          <div className="bg-white rounded-2xl p-10 text-center text-charcoal-400 shadow-sm">
+        {loading ? <p className="text-tone-faint text-sm">Loading...</p> : tracks.length === 0 ? (
+          <div className="bg-white rounded-card p-10 text-center text-tone-faint shadow-card">
             <Music size={36} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm">No tracks yet. Add your first prayer ambient track.</p>
           </div>
         ) : tracks.map((t) => (
-          <div key={t.id} className="bg-white rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div key={t.id} className="bg-white rounded-card p-5 shadow-card flex items-center gap-4">
             <div className="w-10 h-10 bg-charcoal-900 rounded-xl flex items-center justify-center shrink-0">
               <Music size={18} className="text-amber-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-charcoal-900 text-sm truncate">{t.title}</p>
-              <p className="text-xs text-charcoal-400 mt-0.5">
+              <p className="font-semibold text-tone text-sm truncate">{t.title}</p>
+              <p className="text-xs text-tone-faint mt-0.5">
                 {t.artist ?? "No artist"} · {t.is_bundled ? "Bundled" : "Downloadable"}
                 {t.file_url ? "" : " · No file yet"}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button onClick={() => toggleAvailable(t)} className="flex items-center gap-1.5 text-xs font-medium text-charcoal-400 hover:text-charcoal-900 transition-colors">
+              <button onClick={() => toggleAvailable(t)} className="flex items-center gap-1.5 text-xs font-medium text-tone-faint hover:text-tone transition-colors">
                 {t.is_available ? <ToggleRight size={20} className="text-green-500" /> : <ToggleLeft size={20} />}
                 {t.is_available ? "Live" : "Hidden"}
               </button>
-              <button onClick={() => handleDelete(t.id)} className="p-1.5 text-charcoal-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+              <button onClick={() => handleDelete(t.id)} className="p-1.5 text-tone-faint hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
                 <Trash2 size={16} />
               </button>
             </div>

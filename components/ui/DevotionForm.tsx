@@ -90,12 +90,12 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
     router.refresh();
   };
 
-  const inputClass = "w-full bg-cream-50 border border-cream-200 rounded-xl px-4 py-3 text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm";
+  const inputClass = "w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand text-sm";
 
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-charcoal-900">{isEdit ? "Edit Devotion" : "New Devotion"}</h1>
+        <h1 className="text-2xl font-bold text-tone">{isEdit ? "Edit Devotion" : "New Devotion"}</h1>
         <div className="flex items-center gap-3">
           {isEdit && (
             <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors">
@@ -104,7 +104,7 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
           )}
           <button
             onClick={handleSave} disabled={saving}
-            className="bg-amber-400 hover:bg-amber-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
+            className="bg-brand hover:bg-brand-deep text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -113,48 +113,48 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
 
       <div className="space-y-6">
         {/* Publish toggle */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        <div className="bg-white rounded-card p-5 shadow-card flex items-center justify-between">
           <div>
-            <p className="font-semibold text-charcoal-900 text-sm">Published</p>
-            <p className="text-charcoal-400 text-xs mt-0.5">Visible to subscribers in the app</p>
+            <p className="font-semibold text-tone text-sm">Published</p>
+            <p className="text-tone-faint text-xs mt-0.5">Visible to subscribers in the app</p>
           </div>
           <button
             onClick={() => setIsPublished(!isPublished)}
-            className={`relative w-12 h-6 rounded-full transition-colors ${isPublished ? "bg-amber-400" : "bg-gray-200"}`}
+            className={`relative w-12 h-6 rounded-full transition-colors ${isPublished ? "bg-brand" : "bg-gray-200"}`}
           >
             <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isPublished ? "translate-x-7" : "translate-x-1"}`} />
           </button>
         </div>
 
         {/* Basic info */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-          <h2 className="font-semibold text-charcoal-900 text-sm uppercase tracking-wide">Basic Info</h2>
+        <div className="bg-white rounded-card p-5 shadow-card space-y-4">
+          <h2 className="font-semibold text-tone text-sm uppercase tracking-wide">Basic Info</h2>
           <div>
-            <label className="block text-xs font-medium text-charcoal-400 mb-1">Title *</label>
+            <label className="block text-xs font-medium text-tone-faint mb-1">Title *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="Devotion title" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-charcoal-400 mb-1">Image URL</label>
+            <label className="block text-xs font-medium text-tone-faint mb-1">Image URL</label>
             <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={inputClass} placeholder="https://..." />
           </div>
         </div>
 
         {/* Scripture */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-          <h2 className="font-semibold text-charcoal-900 text-sm uppercase tracking-wide">Scripture</h2>
+        <div className="bg-white rounded-card p-5 shadow-card space-y-4">
+          <h2 className="font-semibold text-tone text-sm uppercase tracking-wide">Scripture</h2>
           <div>
-            <label className="block text-xs font-medium text-charcoal-400 mb-1">Reference</label>
+            <label className="block text-xs font-medium text-tone-faint mb-1">Reference</label>
             <input type="text" value={scriptureRef} onChange={(e) => setScriptureRef(e.target.value)} className={inputClass} placeholder="John 3:16" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-charcoal-400 mb-1">Verse Text (KJV)</label>
+            <label className="block text-xs font-medium text-tone-faint mb-1">Verse Text (KJV)</label>
             <textarea value={scriptureText} onChange={(e) => setScriptureText(e.target.value)} rows={3} className={inputClass} placeholder="For God so loved the world..." />
           </div>
         </div>
 
         {/* Body */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <label className="block text-xs font-medium text-charcoal-400 mb-2 uppercase tracking-wide">Devotion Body *</label>
+        <div className="bg-white rounded-card p-5 shadow-card">
+          <label className="block text-xs font-medium text-tone-faint mb-2 uppercase tracking-wide">Devotion Body *</label>
           <textarea
             value={body} onChange={(e) => setBody(e.target.value)} rows={12}
             className={inputClass} placeholder="Write the devotional reading here..."
@@ -162,24 +162,24 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
         </div>
 
         {/* Reflection questions */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className="bg-white rounded-card p-5 shadow-card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-charcoal-900 text-sm uppercase tracking-wide">Reflection Questions</h2>
-            <button onClick={addQuestion} className="flex items-center gap-1 text-sm text-amber-500 hover:text-amber-600 font-medium">
+            <h2 className="font-semibold text-tone text-sm uppercase tracking-wide">Reflection Questions</h2>
+            <button onClick={addQuestion} className="flex items-center gap-1 text-sm text-brand hover:text-brand font-medium">
               <Plus size={15} /> Add
             </button>
           </div>
           <div className="space-y-3">
             {questions.map((q, i) => (
               <div key={i} className="flex items-start gap-3">
-                <GripVertical size={18} className="text-charcoal-400 mt-3 shrink-0" />
+                <GripVertical size={18} className="text-tone-faint mt-3 shrink-0" />
                 <input
                   type="text" value={q.question_text}
                   onChange={(e) => updateQuestion(i, e.target.value)}
                   className={`${inputClass} flex-1`}
                   placeholder={`Question ${i + 1}`}
                 />
-                <button onClick={() => removeQuestion(i)} className="text-charcoal-400 hover:text-red-500 mt-3 transition-colors shrink-0">
+                <button onClick={() => removeQuestion(i)} className="text-tone-faint hover:text-red-500 mt-3 transition-colors shrink-0">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -188,8 +188,8 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
         </div>
 
         {/* Closing prayer */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <label className="block text-xs font-medium text-charcoal-400 mb-2 uppercase tracking-wide">Closing Prayer</label>
+        <div className="bg-white rounded-card p-5 shadow-card">
+          <label className="block text-xs font-medium text-tone-faint mb-2 uppercase tracking-wide">Closing Prayer</label>
           <textarea
             value={prayer} onChange={(e) => setPrayer(e.target.value)} rows={4}
             className={inputClass} placeholder="Lord, we come before you today..."

@@ -37,37 +37,37 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cream-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-page flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-brand rounded-card flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🙏</span>
           </div>
-          <h1 className="text-2xl font-bold text-charcoal-900">Prevail Prayer</h1>
-          <p className="text-charcoal-400 text-sm mt-1">Admin Panel</p>
+          <h1 className="text-3xl font-serif text-tone">Prevail Prayer</h1>
+          <p className="text-tone-faint text-sm mt-1">Admin Panel</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-charcoal-600 mb-1">Email</label>
+            <label className="block text-sm font-medium text-tone-muted mb-1">Email</label>
             <input
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-white border border-cream-200 rounded-xl px-4 py-3 text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand"
               placeholder="admin@example.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-charcoal-600 mb-1">Password</label>
+            <label className="block text-sm font-medium text-tone-muted mb-1">Password</label>
             <input
               type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white border border-cream-200 rounded-xl px-4 py-3 text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand"
               placeholder="••••••••"
             />
           </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             type="submit" disabled={loading}
-            className="w-full bg-amber-400 hover:bg-amber-500 text-white font-semibold py-3 rounded-full transition-colors disabled:opacity-60"
+            className="w-full bg-brand hover:bg-brand-deep text-white font-semibold py-3 rounded-full transition-colors disabled:opacity-60"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
