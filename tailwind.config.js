@@ -21,8 +21,8 @@ module.exports = {
         charcoal: { 400: "#8A8A8A", 600: "#4A4A4A", 900: "#1A1A1A" },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        serif: ["var(--font-serif)", "Georgia", "serif"],
+        sans: ['"Hanken Grotesk"', "system-ui", "sans-serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
       },
       boxShadow: {
         card: "0 2px 14px rgba(40,34,80,0.06)",
