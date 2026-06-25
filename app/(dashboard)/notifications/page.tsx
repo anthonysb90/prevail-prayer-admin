@@ -35,49 +35,41 @@ export default function NotificationsPage() {
     if (!title.trim() || !body.trim()) { alert("Title and body required."); return; }
     setSending(true);
     const supabase = createClient();
+    try {
+      // 1. Save announcement record
+      const { data: announcement, error } = await supabase
+        .from("announcements")
+        .insert({ title: title.trim(), body: body.trim(), type, sent_at: new Date().toISOString() })
+        .select().single();
+      if (error) { alert(error.message); return; }
 
-    // 1. Save announcement record
-    const { data: announcement, error } = await supabase
-      .from("announcements")
-      .insert({ title: title.trim(), body: body.trim(), type, sent_at: new Date().toISOString() })
-      .select().single();
+      // 2. Fetch all push tokens (client read is allowed by RLS)
+      const { data: tokens } = await supabase.from("user_push_tokens").select("expo_push_token");
+      const pushTokens = (tokens?.map((t) => t.expo_push_token) ?? []).filter(Boolean);
 
-    if (error) { alert(error.message); setSending(false); return; }
-
-    // 2. Fetch all push tokens
-    const { data: tokens } = await supabase.from("user_push_tokens").select("expo_push_token");
-    const pushTokens = tokens?.map((t) => t.expo_push_token) ?? [];
-
-    // 3. Send via Expo Push API in batches of 100
-    if (pushTokens.length > 0) {
-      const batches = [];
-      for (let i = 0; i < pushTokens.length; i += 100) {
-        batches.push(pushTokens.slice(i, i + 100));
+      // 3. Send via our server route (Expo's API can't be called from the browser)
+      let sent = 0;
+      const res = await fetch("/api/send-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokens: pushTokens, title: title.trim(), body: body.trim(), type }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        sent = j.sent ?? 0;
+      } else {
+        alert("Announcement saved, but push delivery failed.");
       }
-      await Promise.all(
-        batches.map((batch) =>
-          fetch("https://exp.host/--/api/v2/push/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify(
-              batch.map((token) => ({
-                to: token,
-                title: title.trim(),
-                body: body.trim(),
-                data: { screen: "/notifications", type },
-                sound: "default",
-              }))
-            ),
-          })
-        )
-      );
-    }
 
-    setHistory((h) => [announcement, ...h]);
-    setTitle("");
-    setBody("");
-    setSending(false);
-    alert(`Sent to ${pushTokens.length} devices.`);
+      setHistory((h) => [announcement, ...h]);
+      setTitle("");
+      setBody("");
+      alert(`Sent to ${sent} device${sent === 1 ? "" : "s"}.`);
+    } catch (e: any) {
+      alert("Something went wrong: " + (e?.message ?? "unknown error"));
+    } finally {
+      setSending(false);
+    }
   };
 
   const inputClass = "w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand text-sm";
