@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, ImageIcon } from "lucide-react";
+import ImagePickerModal from "@/components/ui/ImagePickerModal";
 import { createClient } from "@/lib/supabase/client";
 
 interface Question { id?: string; question_text: string; sort_order: number }
@@ -31,6 +32,7 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
   const [body, setBody] = useState(initial.body ?? "");
   const [prayer, setPrayer] = useState(initial.closing_prayer ?? "");
   const [isPublished, setIsPublished] = useState(initial.is_published ?? false);
+  const [showImagePicker, setShowImagePicker] = useState(false);
   const [questions, setQuestions] = useState<Question[]>(
     initial.questions ?? [{ question_text: "", sort_order: 0 }]
   );
@@ -134,8 +136,23 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="Devotion title" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-tone-faint mb-1">Image URL</label>
-            <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={inputClass} placeholder="https://..." />
+            <label className="block text-xs font-medium text-tone-faint mb-1">Image</label>
+            <div className="flex items-center gap-2">
+              <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={`${inputClass} flex-1`} placeholder="Paste a URL or browse photos" />
+              <button
+                type="button"
+                onClick={() => setShowImagePicker(true)}
+                className="shrink-0 flex items-center gap-2 bg-page hover:bg-line text-tone border border-line rounded-xl px-4 py-3 text-sm font-medium transition-colors"
+              >
+                <ImageIcon size={16} /> Browse
+              </button>
+            </div>
+            {imageUrl ? (
+              <div className="mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imageUrl} alt="Selected" className="w-full max-h-48 object-cover rounded-xl border border-line" />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -196,6 +213,13 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
           />
         </div>
       </div>
+
+      {showImagePicker && (
+        <ImagePickerModal
+          onSelect={(url) => setImageUrl(url)}
+          onClose={() => setShowImagePicker(false)}
+        />
+      )}
     </div>
   );
 }
