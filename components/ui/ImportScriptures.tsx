@@ -37,7 +37,7 @@ export default function ImportScriptures({ onImported }: { onImported?: () => vo
     setDone(data?.length ?? items.length); setImporting(false); onImported?.();
   };
 
-  const topics = [...new Set(items.map((i) => i.topic))];
+  const topics = Array.from(new Set(items.map((i) => i.topic)));
 
   return (
     <>
