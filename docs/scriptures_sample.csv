@@ -1,0 +1,11 @@
+reference,verse_text,topic,is_featured
+Philippians 4:6-7,"Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God.",Prayer,true
+James 5:16,"The effectual fervent prayer of a righteous man availeth much.",Prayer,false
+Isaiah 41:10,"Fear thou not; for I am with thee: be not dismayed; for I am thy God.",Trust,true
+Psalm 46:10,"Be still, and know that I am God.",Peace,true
+Proverbs 3:5-6,"Trust in the LORD with all thine heart; and lean not unto thine own understanding.",Guidance,true
+Isaiah 53:5,"With his stripes we are healed.",Healing,false
+Hebrews 11:1,"Now faith is the substance of things hoped for, the evidence of things not seen.",Faith,true
+Romans 8:28,"And we know that all things work together for good to them that love God.",Faith,false
+Jeremiah 29:11,"For I know the thoughts that I think toward you, saith the LORD, thoughts of peace, and not of evil.",Hope,true
+Psalm 150:6,"Let every thing that hath breath praise the LORD.",Praise,false

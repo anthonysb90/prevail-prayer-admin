@@ -17,6 +17,8 @@ interface DevotionFormProps {
     body?: string;
     closing_prayer?: string;
     is_published?: boolean;
+    published_at?: string | null;
+    scheduled_for?: string | null;
     questions?: Question[];
   };
 }
@@ -31,7 +33,16 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
   const [scriptureText, setScriptureText] = useState(initial.scripture_text ?? "");
   const [body, setBody] = useState(initial.body ?? "");
   const [prayer, setPrayer] = useState(initial.closing_prayer ?? "");
-  const [isPublished, setIsPublished] = useState(initial.is_published ?? false);
+  // Scheduling mode derived from the devotion's current state.
+  const initialMode: "draft" | "now" | "schedule" =
+    initial.is_published ? "now" : initial.scheduled_for ? "schedule" : "draft";
+  const [pubMode, setPubMode] = useState<"draft" | "now" | "schedule">(initialMode);
+  const toLocalInput = (iso?: string | null) => {
+    const d = iso ? new Date(iso) : new Date(Date.now() + 24 * 3600 * 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [scheduleAt, setScheduleAt] = useState<string>(toLocalInput(initial.scheduled_for));
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [questions, setQuestions] = useState<Question[]>(
     initial.questions ?? [{ question_text: "", sort_order: 0 }]
@@ -57,9 +68,14 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
       scripture_text: scriptureText.trim() || null,
       body: body.trim(),
       closing_prayer: prayer.trim() || null,
-      is_published: isPublished,
-      published_at: isPublished ? new Date().toISOString() : null,
+      is_published: pubMode === "now",
+      published_at: pubMode === "now" ? new Date().toISOString() : null,
+      scheduled_for: pubMode === "schedule" ? new Date(scheduleAt).toISOString() : null,
     };
+    if (pubMode === "schedule" && (!scheduleAt || isNaN(new Date(scheduleAt).getTime()))) {
+      alert("Please choose a date and time to schedule this devotion.");
+      return;
+    }
 
     let devotionId = initial.id;
 
@@ -114,18 +130,40 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
       </div>
 
       <div className="space-y-6">
-        {/* Publish toggle */}
-        <div className="bg-white rounded-card p-5 shadow-card flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-tone text-sm">Published</p>
-            <p className="text-tone-faint text-xs mt-0.5">Visible to subscribers in the app</p>
+        {/* Publish / schedule */}
+        <div className="bg-white rounded-card p-5 shadow-card">
+          <p className="font-semibold text-tone text-sm mb-3">Publishing</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              ["draft", "Draft", "Hidden"],
+              ["now", "Publish now", "Live immediately"],
+              ["schedule", "Schedule", "Go live on a date"],
+            ] as const).map(([val, label, hint]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setPubMode(val)}
+                className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                  pubMode === val ? "border-brand bg-brand-soft" : "border-line hover:bg-page"
+                }`}
+              >
+                <span className={`block text-sm font-semibold ${pubMode === val ? "text-brand-deep" : "text-tone"}`}>{label}</span>
+                <span className="block text-xs text-tone-faint mt-0.5">{hint}</span>
+              </button>
+            ))}
           </div>
-          <button
-            onClick={() => setIsPublished(!isPublished)}
-            className={`relative w-12 h-6 rounded-full transition-colors ${isPublished ? "bg-brand" : "bg-gray-200"}`}
-          >
-            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isPublished ? "translate-x-7" : "translate-x-1"}`} />
-          </button>
+          {pubMode === "schedule" && (
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-tone-faint mb-1">Publish date &amp; time</label>
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand text-sm"
+              />
+              <p className="text-xs text-tone-faint mt-2">It stays hidden until this time, then publishes automatically.</p>
+            </div>
+          )}
         </div>
 
         {/* Basic info */}

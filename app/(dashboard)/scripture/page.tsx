@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ImportScriptures from "@/components/ui/ImportScriptures";
 
 const TOPICS = ["Prayer","Faith","Healing","Peace","Guidance","Trust","Praise","Warfare","Salvation","Hope"];
 
@@ -51,9 +52,12 @@ export default function ScripturePage() {
           <h1 className="text-3xl font-serif text-tone">Scripture Library</h1>
           <p className="text-tone-faint text-sm mt-1">KJV — {verses.length} verses in this topic</p>
         </div>
-        <button onClick={() => setAdding(true)} className="flex items-center gap-2 bg-brand hover:bg-brand-deep text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
-          <Plus size={16} /> Add Verse
-        </button>
+        <div className="flex items-center gap-3">
+          <ImportScriptures onImported={() => { setLoading(true); supabase.from("scripture_verses").select("*").eq("topic", topic).order("sort_order").then(({ data }) => { setVerses(data ?? []); setLoading(false); }); }} />
+          <button onClick={() => setAdding(true)} className="flex items-center gap-2 bg-brand hover:bg-brand-deep text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors">
+            <Plus size={16} /> Add Verse
+          </button>
+        </div>
       </div>
 
       {/* Topic tabs */}

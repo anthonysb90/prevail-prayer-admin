@@ -73,3 +73,29 @@ export function rowsToDevotions(rows: string[][]): { items: DevotionRow[]; error
   }
   return { items };
 }
+
+export interface ScriptureRow {
+  reference: string;
+  verse_text: string;
+  topic: string;
+  is_featured: boolean;
+}
+
+export function rowsToScriptures(rows: string[][]): { items: ScriptureRow[]; error?: string } {
+  if (rows.length < 2) return { items: [], error: "CSV needs a header row and at least one verse." };
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const ix = (n: string) => header.indexOf(n);
+  const iRef = ix("reference"), iText = ix("verse_text"), iTopic = ix("topic"), iFeat = ix("is_featured");
+  if (iRef === -1 || iText === -1 || iTopic === -1) {
+    return { items: [], error: "CSV must include 'reference', 'verse_text', and 'topic' columns." };
+  }
+  const truthy = (v: string) => ["true", "yes", "1", "y"].includes((v || "").trim().toLowerCase());
+  const items: ScriptureRow[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const c = rows[r];
+    const ref = (c[iRef] ?? "").trim(), text = (c[iText] ?? "").trim(), topic = (c[iTopic] ?? "").trim();
+    if (!ref || !text || !topic) continue;
+    items.push({ reference: ref, verse_text: text, topic, is_featured: iFeat >= 0 ? truthy(c[iFeat]) : false });
+  }
+  return { items };
+}
