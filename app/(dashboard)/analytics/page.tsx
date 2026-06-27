@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { subDays, format, eachDayOfInterval } from "date-fns";
 import { SignupsLine, PlanPie, StateBar } from "@/components/ui/AnalyticsCharts";
-import { zipToState } from "@/lib/zip";
-import { ExternalLink, TrendingUp, UserCheck, MapPin } from "lucide-react";
+import { ageFromBirthday } from "@/lib/age";
+import { ExternalLink, TrendingUp, UserCheck, Cake } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function AnalyticsPage() {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("created_at, subscription_status, zip_code, last_active_at, last_prayer_date");
+    .select("created_at, subscription_status, birthday, last_active_at, last_prayer_date");
 
   const rows = profiles ?? [];
 
@@ -52,16 +52,26 @@ export default async function AnalyticsPage() {
     return t && new Date(t) >= sevenAgo;
   }).length;
 
-  // Top states by zip
-  const stateCounts: Record<string, number> = {};
+  // Age distribution (from birthday)
+  const AGE_BUCKETS: { label: string; min: number; max: number }[] = [
+    { label: "Under 18", min: 0, max: 17 },
+    { label: "18–24", min: 18, max: 24 },
+    { label: "25–34", min: 25, max: 34 },
+    { label: "35–44", min: 35, max: 44 },
+    { label: "45–54", min: 45, max: 54 },
+    { label: "55–64", min: 55, max: 64 },
+    { label: "65+", min: 65, max: 200 },
+  ];
+  const ageCounts: Record<string, number> = {};
   for (const r of rows) {
-    const st = zipToState(r.zip_code);
-    if (st) stateCounts[st] = (stateCounts[st] ?? 0) + 1;
+    const a = ageFromBirthday((r as any).birthday);
+    if (a == null) continue;
+    const bucket = AGE_BUCKETS.find((b) => a >= b.min && a <= b.max);
+    if (bucket) ageCounts[bucket.label] = (ageCounts[bucket.label] ?? 0) + 1;
   }
-  const states = Object.entries(stateCounts)
-    .map(([state, users]) => ({ state, users }))
-    .sort((a, b) => b.users - a.users)
-    .slice(0, 10);
+  const ages = AGE_BUCKETS
+    .filter((b) => ageCounts[b.label])
+    .map((b) => ({ state: b.label, users: ageCounts[b.label] }));
 
   const kpis = [
     { label: "New signups (30d)", value: signups.reduce((s, d) => s + d.signups, 0), icon: TrendingUp },
@@ -106,10 +116,10 @@ export default async function AnalyticsPage() {
         </div>
         <div className="bg-white rounded-card p-6 border border-line shadow-card">
           <div className="flex items-center gap-2 mb-4">
-            <MapPin size={18} className="text-brand" />
-            <h2 className="font-serif text-lg text-tone">Top states (by zip)</h2>
+            <Cake size={18} className="text-brand" />
+            <h2 className="font-serif text-lg text-tone">Age distribution</h2>
           </div>
-          {states.length ? <StateBar data={states} /> : <p className="text-sm text-tone-faint">No location data yet.</p>}
+          {ages.length ? <StateBar data={ages} /> : <p className="text-sm text-tone-faint">No birthday data yet.</p>}
         </div>
       </div>
     </div>

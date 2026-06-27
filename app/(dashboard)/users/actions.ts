@@ -2,7 +2,14 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/audit";
+import { ageFromBirthday } from "@/lib/age";
 import { revalidatePath } from "next/cache";
+
+function csvCell(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
 
 // A far-future expiry stands in for a lifetime gift, so the app's single
 // "comp_until > now" check covers month, year, and lifetime uniformly.
@@ -38,6 +45,7 @@ export async function setCompAccess(userId: string, plan: GiftPlan): Promise<{ e
 
   const { error } = await admin.from("profiles").update({ comp_until }).eq("id", userId);
   if (error) return { error: error.message };
+  await recordAudit("gift_pro", { targetType: "user", targetId: userId, detail: { plan } });
   revalidatePath(`/users/${userId}`);
   revalidatePath("/users");
   return {};
@@ -67,6 +75,7 @@ export async function editUser(
     })
     .eq("id", userId);
   if (error) return { error: error.message };
+  await recordAudit("edit_user", { targetType: "user", targetId: userId });
   revalidatePath(`/users/${userId}`);
   revalidatePath("/users");
   return {};
@@ -86,6 +95,7 @@ export async function sendPasswordReset(userId: string): Promise<{ error?: strin
   const redirectTo = process.env.NEXT_PUBLIC_RESET_REDIRECT_URL || undefined;
   const { error } = await admin.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
   if (error) return { error: error.message };
+  await recordAudit("send_password_reset", { targetType: "user", targetId: userId });
   return { ok: true };
 }
 
@@ -98,7 +108,48 @@ export async function setTempPassword(userId: string, password: string): Promise
   if (!password || password.length < 8) return { error: "Use at least 8 characters." };
   const { error } = await admin.auth.admin.updateUserById(userId, { password });
   if (error) return { error: error.message };
+  await recordAudit("set_temp_password", { targetType: "user", targetId: userId });
   return { ok: true };
+}
+
+/** Export all matching users to a CSV string (respects the search query). */
+export async function exportUsersCsv(q: string): Promise<{ csv?: string; error?: string }> {
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
+
+  let query = admin
+    .from("profiles")
+    .select("id, display_name, phone, birthday, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100000);
+
+  const safeQ = (q ?? "").replace(/[,()*:\\%]/g, "").slice(0, 80);
+  if (safeQ) query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`);
+
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+
+  const header = ["Name", "Phone", "Age", "Birthday", "Subscription", "Pro gift until", "Streak (days)", "Last active", "Joined", "User ID"];
+  const lines = [header.join(",")];
+  for (const u of data ?? []) {
+    const lastActive = (u as any).last_active_at ?? (u as any).last_prayer_date ?? "";
+    lines.push([
+      csvCell(u.display_name),
+      csvCell(u.phone),
+      csvCell(ageFromBirthday(u.birthday as string) ?? ""),
+      csvCell(u.birthday),
+      csvCell(u.subscription_status ?? "free"),
+      csvCell(u.comp_until),
+      csvCell(u.prayer_streak ?? 0),
+      csvCell(lastActive),
+      csvCell(u.created_at),
+      csvCell(u.id),
+    ].join(","));
+  }
+
+  await recordAudit("export_users", { detail: { count: (data ?? []).length, query: safeQ || null } });
+  return { csv: lines.join("\n") };
 }
 
 /** Permanently delete a user (auth + cascaded data). Keeps the email on record. */
@@ -116,6 +167,7 @@ export async function deleteUser(userId: string): Promise<{ error?: string; ok?:
 
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { error: error.message };
+  await recordAudit("delete_user", { targetType: "user", targetId: userId });
   revalidatePath("/users");
   return { ok: true };
 }

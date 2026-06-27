@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3,
+  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3, ScrollText,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/music", label: "Music", icon: Music2 },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/users", label: "Users", icon: Users },
+  { href: "/audit", label: "Audit Log", icon: ScrollText },
 ];
 
 function CrossMark() {

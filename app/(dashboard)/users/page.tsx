@@ -6,6 +6,7 @@ import { Users, Search } from "lucide-react";
 import { formatPhone } from "@/lib/zip";
 import { ageFromBirthday } from "@/lib/age";
 import { GiftProMenu } from "./GiftProMenu";
+import { ExportUsersButton } from "./ExportUsersButton";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +50,16 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
           <h1 className="text-3xl font-serif text-tone">Users</h1>
           <p className="text-tone-faint text-sm mt-1">{count?.toLocaleString() ?? 0} total accounts</p>
         </div>
-        <form className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-tone-faint" />
-          <input
-            type="text" name="q" defaultValue={q} placeholder="Search name or phone…"
-            className="pl-9 pr-4 py-2.5 rounded-card border border-line bg-white text-sm text-tone w-72 outline-none focus:border-brand"
-          />
-        </form>
+        <div className="flex items-end gap-3">
+          <form className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-tone-faint" />
+            <input
+              type="text" name="q" defaultValue={q} placeholder="Search name or phone…"
+              className="pl-9 pr-4 py-2.5 rounded-card border border-line bg-white text-sm text-tone w-72 outline-none focus:border-brand"
+            />
+          </form>
+          <ExportUsersButton q={q} />
+        </div>
       </div>
 
       {!usingAdmin && (

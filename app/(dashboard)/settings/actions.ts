@@ -3,6 +3,7 @@
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/audit";
 
 const PW_KEY = "devotion_submit_password_sha256";
 
@@ -38,5 +39,6 @@ export async function setContributorPassword(password: string): Promise<{ ok?: b
     .from("app_settings")
     .upsert({ key: PW_KEY, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
   if (error) return { error: error.message };
+  await recordAudit("set_contributor_password", { targetType: "setting", targetId: PW_KEY });
   return { ok: true };
 }
