@@ -6,9 +6,10 @@ import { revalidatePath } from "next/cache";
 
 // A far-future expiry stands in for a lifetime gift, so the app's single
 // "comp_until > now" check covers month, year, and lifetime uniformly.
-export const LIFETIME_COMP = "2999-12-31T00:00:00.000Z";
+// (Not exported: a "use server" module may only export async functions.)
+const LIFETIME_COMP = "2999-12-31T00:00:00.000Z";
 
-export type GiftPlan = "month" | "year" | "lifetime" | "revoke";
+type GiftPlan = "month" | "year" | "lifetime" | "revoke";
 
 /**
  * Gift (or revoke) Pro access for a user by setting profiles.comp_until.

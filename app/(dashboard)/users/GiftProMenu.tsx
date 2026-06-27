@@ -2,7 +2,9 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { Gift, Check, ChevronDown } from "lucide-react";
-import { setCompAccess, type GiftPlan } from "./actions";
+import { setCompAccess } from "./actions";
+
+type GiftPlan = "month" | "year" | "lifetime" | "revoke";
 
 interface Props {
   userId: string;
