@@ -2,6 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
+  // Public, password-gated routes that must work without an admin login:
+  // the devotion contributor page and the image search/track APIs it uses.
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/contribute") || path.startsWith("/api/images")) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

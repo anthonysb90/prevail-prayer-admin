@@ -1,4 +1,5 @@
 import { CreditCard, ShieldCheck, BellRing } from "lucide-react";
+import ContributorPasswordCard from "./ContributorPasswordCard";
 
 export default function SettingsPage() {
   return (
@@ -45,6 +46,8 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
+
+        <ContributorPasswordCard />
       </div>
     </div>
   );

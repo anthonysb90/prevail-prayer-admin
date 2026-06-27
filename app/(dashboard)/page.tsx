@@ -1,8 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Users, BookOpen, Timer, Heart } from "lucide-react";
 
+// Use the service-role client so counts/activity span ALL users. The regular
+// (RLS-scoped) client only sees the signed-in admin's own rows — which is why
+// the Overview previously showed "1 member".
+
 async function getStats() {
-  const supabase = createClient();
+  const supabase = createAdminClient() ?? createClient();
   const [users, prayers, answered, sessions, devotions] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("prayer_requests").select("id", { count: "exact", head: true }).in("status", ["active", "ongoing"]),
@@ -20,7 +25,7 @@ async function getStats() {
 }
 
 async function getRecentActivity() {
-  const supabase = createClient();
+  const supabase = createAdminClient() ?? createClient();
   const [prayers, devotionList] = await Promise.all([
     supabase.from("prayer_requests").select("id, title, status, created_at").order("created_at", { ascending: false }).limit(5),
     supabase.from("devotions").select("id, title, published_at, is_published").order("created_at", { ascending: false }).limit(5),

@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { format } from "date-fns";
 import { Users, Search } from "lucide-react";
-import { zipToState, formatPhone } from "@/lib/zip";
+import { formatPhone } from "@/lib/zip";
+import { ageFromBirthday } from "@/lib/age";
 import { GiftProMenu } from "./GiftProMenu";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +17,18 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
   let query = supabase
     .from("profiles")
     .select(
-      "id, display_name, avatar_url, phone, zip_code, prayer_streak, subscription_status, comp_until, last_prayer_date, last_active_at, created_at",
+      "id, display_name, avatar_url, phone, birthday, prayer_streak, subscription_status, comp_until, last_prayer_date, last_active_at, created_at",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
     .limit(200);
 
   if (q) {
-    // Strip characters that are meaningful in a PostgREST `.or()` filter so a
-    // crafted search term can't alter the query (filter injection).
+    // Strip characters meaningful in a PostgREST `.or()` filter so a crafted
+    // search term can't alter the query (filter injection).
     const safeQ = q.replace(/[,()*:\\%]/g, "").slice(0, 80);
     if (safeQ) {
-      query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,zip_code.ilike.%${safeQ}%`);
+      query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`);
     }
   }
 
@@ -50,7 +52,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
         <form className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-tone-faint" />
           <input
-            type="text" name="q" defaultValue={q} placeholder="Search name, phone, zip…"
+            type="text" name="q" defaultValue={q} placeholder="Search name or phone…"
             className="pl-9 pr-4 py-2.5 rounded-card border border-line bg-white text-sm text-tone w-72 outline-none focus:border-brand"
           />
         </form>
@@ -72,20 +74,20 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
           <table className="w-full">
             <thead className="border-b border-line">
               <tr>
-                {["Name", "Phone", "Location", "Subscription", "Streak", "Last Active", "Joined", "Pro Access"].map((h) => (
+                {["Name", "Phone", "Age", "Subscription", "Streak", "Last Active", "Joined", "Pro Access"].map((h) => (
                   <th key={h} className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {profiles.map((u: any) => {
-                const state = zipToState(u.zip_code);
+                const age = ageFromBirthday(u.birthday);
                 const lastActive = u.last_active_at ?? u.last_prayer_date;
                 const comped = !!u.comp_until && new Date(u.comp_until).getTime() > Date.now();
                 return (
                   <tr key={u.id} className="hover:bg-page transition-colors">
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <Link href={`/users/${u.id}`} className="flex items-center gap-3 group">
                         {u.avatar_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover bg-brand-soft" />
@@ -94,15 +96,13 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
                             {(u.display_name?.[0] ?? "?").toUpperCase()}
                           </div>
                         )}
-                        <span className="font-medium text-tone text-sm">
+                        <span className="font-medium text-tone text-sm group-hover:text-brand transition-colors">
                           {u.display_name ?? <span className="text-tone-faint italic">No name</span>}
                         </span>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-5 py-4 text-sm text-tone-muted">{formatPhone(u.phone)}</td>
-                    <td className="px-5 py-4 text-sm text-tone-muted">
-                      {u.zip_code ? `${u.zip_code}${state ? ` · ${state}` : ""}` : "—"}
-                    </td>
+                    <td className="px-5 py-4 text-sm text-tone-muted">{age != null ? age : "—"}</td>
                     <td className="px-5 py-4">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${statusColors[u.subscription_status ?? "free"] ?? statusColors.free}`}>
                         {u.subscription_status ?? "free"}

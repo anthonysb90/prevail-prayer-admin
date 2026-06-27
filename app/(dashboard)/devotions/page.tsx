@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Plus, Pencil } from "lucide-react";
 import ImportDevotions from "@/components/ui/ImportDevotions";
 import { format } from "date-fns";
 
 export default async function DevotionsPage() {
-  const supabase = createClient();
+  const supabase = createAdminClient() ?? createClient();
   const { data } = await supabase
     .from("devotions")
-    .select("id, title, is_published, published_at, scheduled_for, created_at")
+    .select("id, title, is_published, published_at, scheduled_for, created_at, submitted_by")
     .order("created_at", { ascending: false });
   const devotions = data ?? [];
 
@@ -46,7 +47,14 @@ export default async function DevotionsPage() {
             <tbody className="divide-y divide-line">
               {devotions.map((d) => (
                 <tr key={d.id} className="hover:bg-page transition-colors">
-                  <td className="px-6 py-4 font-medium text-tone">{d.title}</td>
+                  <td className="px-6 py-4 font-medium text-tone">
+                    <div className="flex items-center gap-2">
+                      <span>{d.title}</span>
+                      {d.submitted_by && !d.is_published && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">Review · {d.submitted_by}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                       d.is_published ? "bg-green-100 text-green-700"
