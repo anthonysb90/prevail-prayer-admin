@@ -22,7 +22,12 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
     .limit(200);
 
   if (q) {
-    query = query.or(`display_name.ilike.%${q}%,phone.ilike.%${q}%,zip_code.ilike.%${q}%`);
+    // Strip characters that are meaningful in a PostgREST `.or()` filter so a
+    // crafted search term can't alter the query (filter injection).
+    const safeQ = q.replace(/[,()*:\\%]/g, "").slice(0, 80);
+    if (safeQ) {
+      query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,zip_code.ilike.%${safeQ}%`);
+    }
   }
 
   const { data, count } = await query;
