@@ -1,7 +1,13 @@
 "use server";
 
 import { createHash, timingSafeEqual } from "crypto";
+import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+function clientIp(): string {
+  const h = headers();
+  return (h.get("x-forwarded-for")?.split(",")[0]?.trim()) || h.get("x-real-ip") || "unknown";
+}
 
 const PW_KEY = "devotion_submit_password_sha256";
 
@@ -96,6 +102,13 @@ export async function submitDevotion(
 
   const admin = createAdminClient();
   if (!admin) return { error: "Submissions are temporarily unavailable." };
+
+  // Rate-limit by IP in case the link leaks (max 15 submissions / hour).
+  const ip = clientIp();
+  const since = new Date(Date.now() - 3600_000).toISOString();
+  const { count } = await admin.from("contribute_attempts").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", since);
+  if ((count ?? 0) >= 15) return { error: "Too many submissions from your network. Please try again later." };
+  await admin.from("contribute_attempts").insert({ ip }).then(() => {}, () => {});
 
   const { data, error } = await admin
     .from("devotions")

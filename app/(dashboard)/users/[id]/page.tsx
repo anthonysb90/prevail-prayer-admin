@@ -141,6 +141,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
           <UserAdminControls
             userId={id}
             hasEmail={!!authUser?.email}
+            role={(profile.admin_role as "admin" | "editor" | "none") ?? (profile.is_admin ? "admin" : "none")}
             initial={{
               display_name: profile.display_name ?? "",
               phone: profile.phone ?? "",

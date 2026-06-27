@@ -1,4 +1,5 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -25,9 +26,24 @@ function CrossMark() {
   );
 }
 
+const EDITOR_PATHS = ["/devotions", "/scripture", "/music"];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      supabase.from("profiles").select("admin_role").eq("id", data.user.id).single()
+        .then(({ data: p }) => setRole((p?.admin_role as string) ?? "admin"));
+    });
+  }, []);
+
+  const isEditor = role === "editor";
+  const nav = isEditor ? NAV.filter((n) => EDITOR_PATHS.includes(n.href)) : NAV;
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -51,7 +67,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
@@ -68,15 +84,17 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10 space-y-1">
-        <Link
-          href="/settings"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-            pathname.startsWith("/settings") ? "bg-brand text-white font-semibold" : "text-white/55 hover:text-white hover:bg-white/10"
-          }`}
-        >
-          <Settings size={18} />
-          Settings
-        </Link>
+        {!isEditor && (
+          <Link
+            href="/settings"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              pathname.startsWith("/settings") ? "bg-brand text-white font-semibold" : "text-white/55 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <Settings size={18} />
+            Settings
+          </Link>
+        )}
         <button
           onClick={handleSignOut}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/55 hover:text-white hover:bg-white/10 transition-colors"

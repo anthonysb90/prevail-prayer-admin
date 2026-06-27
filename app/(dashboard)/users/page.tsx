@@ -10,10 +10,18 @@ import { ExportUsersButton } from "./ExportUsersButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function UsersPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function UsersPage({ searchParams }: { searchParams: { q?: string; page?: string; sort?: string; dir?: string } }) {
   const supabase = createAdminClient() ?? createClient();
   const usingAdmin = !!createAdminClient();
   const q = (searchParams?.q ?? "").trim();
+
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, parseInt(searchParams?.page ?? "1", 10) || 1);
+  const SORTS: Record<string, string> = { joined: "created_at", streak: "prayer_streak", name: "display_name" };
+  const sortKey = SORTS[searchParams?.sort ?? ""] ? (searchParams!.sort as string) : "joined";
+  const sortCol = SORTS[sortKey];
+  const dir: "asc" | "desc" = searchParams?.dir === "asc" ? "asc" : "desc";
+  const from = (page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("profiles")
@@ -21,20 +29,26 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
       "id, display_name, avatar_url, phone, birthday, prayer_streak, subscription_status, comp_until, last_prayer_date, last_active_at, created_at",
       { count: "exact" }
     )
-    .order("created_at", { ascending: false })
-    .limit(200);
+    .order(sortCol, { ascending: dir === "asc" })
+    .range(from, from + PAGE_SIZE - 1);
 
-  if (q) {
-    // Strip characters meaningful in a PostgREST `.or()` filter so a crafted
-    // search term can't alter the query (filter injection).
-    const safeQ = q.replace(/[,()*:\\%]/g, "").slice(0, 80);
-    if (safeQ) {
-      query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`);
-    }
-  }
+  // Strip characters meaningful in a PostgREST `.or()` filter (injection guard).
+  const safeQ = q.replace(/[,()*:\\%]/g, "").slice(0, 80);
+  if (safeQ) query = query.or(`display_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`);
 
   const { data, count } = await query;
   const profiles = data ?? [];
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+
+  const qp = (over: Record<string, string | number>) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    sp.set("sort", sortKey); sp.set("dir", dir); sp.set("page", String(page));
+    for (const [k, v] of Object.entries(over)) sp.set(k, String(v));
+    return `/users?${sp.toString()}`;
+  };
+  const sortHref = (key: string) => qp({ sort: key, dir: sortKey === key && dir === "desc" ? "asc" : "desc", page: 1 });
+  const arrow = (key: string) => (sortKey === key ? (dir === "asc" ? " ↑" : " ↓") : "");
 
   const statusColors: Record<string, string> = {
     free: "bg-gray-100 text-gray-600",
@@ -78,9 +92,14 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
           <table className="w-full">
             <thead className="border-b border-line">
               <tr>
-                {["Name", "Phone", "Age", "Subscription", "Streak", "Last Active", "Joined", "Pro Access"].map((h) => (
-                  <th key={h} className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">{h}</th>
-                ))}
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider"><Link href={sortHref("name")} className="hover:text-tone">Name{arrow("name")}</Link></th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">Phone</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">Age</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">Subscription</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider"><Link href={sortHref("streak")} className="hover:text-tone">Streak{arrow("streak")}</Link></th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">Last Active</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider"><Link href={sortHref("joined")} className="hover:text-tone">Joined{arrow("joined")}</Link></th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">Pro Access</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -129,6 +148,16 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
           </table>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-tone-muted">
+          <span>Page {page} of {totalPages}</span>
+          <div className="flex gap-2">
+            {page > 1 && <Link href={qp({ page: page - 1 })} className="px-3 py-1.5 rounded-lg border border-line hover:border-brand">Prev</Link>}
+            {page < totalPages && <Link href={qp({ page: page + 1 })} className="px-3 py-1.5 rounded-lg border border-line hover:border-brand">Next</Link>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, KeyRound, Mail, Trash2, Check, X } from "lucide-react";
-import { editUser, sendPasswordReset, setTempPassword, deleteUser } from "./actions";
+import { Pencil, KeyRound, Mail, Trash2, Check, X, Shield } from "lucide-react";
+import { editUser, sendPasswordReset, setTempPassword, deleteUser, setUserRole } from "./actions";
+
+type Role = "admin" | "editor" | "none";
 
 interface Props {
   userId: string;
   hasEmail: boolean;
+  role: Role;
   initial: { display_name: string; phone: string; birthday: string };
 }
 
@@ -24,10 +27,20 @@ function randomPassword(): string {
   return out;
 }
 
-export function UserAdminControls({ userId, hasEmail, initial }: Props) {
+export function UserAdminControls({ userId, hasEmail, role, initial }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [roleVal, setRoleVal] = useState<Role>(role);
+
+  const chooseRole = (r: Role) => {
+    setMsg(null);
+    startTransition(async () => {
+      const res = await setUserRole(userId, r);
+      if (res.error) setMsg({ kind: "err", text: res.error });
+      else { setRoleVal(r); setMsg({ kind: "ok", text: `Panel access set to ${r === "none" ? "no access" : r}.` }); router.refresh(); }
+    });
+  };
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(initial.display_name);
@@ -121,6 +134,20 @@ export function UserAdminControls({ userId, hasEmail, initial }: Props) {
         <button onClick={doTempPw} disabled={pending || tempPw.length < 8} className={`${btn} border border-line text-tone hover:border-brand hover:text-brand w-full justify-center`}>
           <KeyRound size={15} /> Set temporary password
         </button>
+      </div>
+
+      {/* Panel access */}
+      <div className="border-t border-line pt-4">
+        <p className="text-xs font-semibold text-tone-faint uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={13} /> Admin panel access</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(["admin", "editor", "none"] as Role[]).map((r) => (
+            <button key={r} onClick={() => chooseRole(r)} disabled={pending}
+              className={`text-xs font-semibold px-2 py-2 rounded-lg border transition-colors disabled:opacity-50 ${roleVal === r ? "border-brand bg-brand-soft text-brand-deep" : "border-line text-tone-muted hover:border-brand"}`}>
+              {r === "none" ? "No access" : r === "admin" ? "Admin" : "Editor"}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-tone-faint mt-1.5">Editor = devotions, scripture &amp; music only.</p>
       </div>
 
       {/* Danger */}

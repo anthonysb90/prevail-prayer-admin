@@ -23,8 +23,8 @@ async function requireAdmin() {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return { error: "Not signed in." as string };
-  const { data: me } = await supabase.from("profiles").select("is_admin").eq("id", auth.user.id).single();
-  if (!me?.is_admin) return { error: "Admins only." as string };
+  const { data: me } = await supabase.from("profiles").select("is_admin, admin_role").eq("id", auth.user.id).single();
+  if (!me?.is_admin || me.admin_role === "editor") return { error: "Admins only." as string };
   const admin = createAdminClient();
   if (!admin) return { error: "Service role key not configured." as string };
   return { admin };
@@ -110,6 +110,20 @@ export async function setTempPassword(userId: string, password: string): Promise
   if (error) return { error: error.message };
   await recordAudit("set_temp_password", { targetType: "user", targetId: userId });
   return { ok: true };
+}
+
+/** Grant/revoke admin-panel access. 'admin' = full, 'editor' = content only, 'none' = no access. */
+export async function setUserRole(userId: string, role: "admin" | "editor" | "none"): Promise<{ error?: string }> {
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
+  const update = role === "none" ? { is_admin: false, admin_role: null } : { is_admin: true, admin_role: role };
+  const { error } = await admin.from("profiles").update(update).eq("id", userId);
+  if (error) return { error: error.message };
+  await recordAudit("set_user_role", { targetType: "user", targetId: userId, detail: { role } });
+  revalidatePath(`/users/${userId}`);
+  revalidatePath("/users");
+  return {};
 }
 
 /** Export all matching users to a CSV string (respects the search query). */

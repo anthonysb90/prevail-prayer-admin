@@ -5,13 +5,23 @@ import { Plus, Pencil } from "lucide-react";
 import ImportDevotions from "@/components/ui/ImportDevotions";
 import { format } from "date-fns";
 
-export default async function DevotionsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DevotionsPage({ searchParams }: { searchParams: { review?: string } }) {
   const supabase = createAdminClient() ?? createClient();
-  const { data } = await supabase
+  const reviewOnly = searchParams?.review === "1";
+
+  let q = supabase
     .from("devotions")
     .select("id, title, is_published, published_at, scheduled_for, created_at, submitted_by")
     .order("created_at", { ascending: false });
+  if (reviewOnly) q = q.not("submitted_by", "is", null).eq("is_published", false);
+  const { data } = await q;
   const devotions = data ?? [];
+
+  const { count: pendingCount } = await supabase
+    .from("devotions").select("id", { count: "exact", head: true })
+    .not("submitted_by", "is", null).eq("is_published", false);
 
   return (
     <div>
@@ -21,6 +31,11 @@ export default async function DevotionsPage() {
           <p className="text-tone-faint text-sm mt-1">{devotions.length} total</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/devotions" className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${!reviewOnly ? "bg-brand-soft text-brand-deep font-semibold" : "text-tone-muted hover:bg-page"}`}>All</Link>
+          <Link href="/devotions?review=1" className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${reviewOnly ? "bg-amber-100 text-amber-700 font-semibold" : "text-tone-muted hover:bg-page"}`}>
+            Needs review{pendingCount ? ` (${pendingCount})` : ""}
+          </Link>
+          <Link href="/devotions/calendar" className="text-sm px-3 py-1.5 rounded-lg text-tone-muted hover:bg-page transition-colors">Calendar</Link>
           <ImportDevotions />
           <Link
             href="/devotions/new"

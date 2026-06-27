@@ -41,12 +41,20 @@ export async function middleware(request: NextRequest) {
   if (user && !isLoginPage) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("is_admin")
+      .select("is_admin, admin_role")
       .eq("id", user.id)
       .single();
 
     if (!profile?.is_admin) {
       return NextResponse.redirect(new URL("/login?error=unauthorized", request.url));
+    }
+
+    // Editors are limited to content pages (devotions / music / scripture).
+    if (profile.admin_role === "editor") {
+      const editorAllowed = ["/devotions", "/music", "/scripture"];
+      const p = request.nextUrl.pathname;
+      const ok = editorAllowed.some((a) => p === a || p.startsWith(a + "/"));
+      if (!ok) return NextResponse.redirect(new URL("/devotions", request.url));
     }
   }
 

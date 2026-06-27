@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { subDays, format, eachDayOfInterval } from "date-fns";
 import { SignupsLine, PlanPie, StateBar } from "@/components/ui/AnalyticsCharts";
 import { ageFromBirthday } from "@/lib/age";
-import { ExternalLink, TrendingUp, UserCheck, Cake } from "lucide-react";
+import { getRevenueOverview, formatRcMetric } from "@/lib/revenuecat";
+import { ExternalLink, TrendingUp, UserCheck, Cake, Flame, DollarSign } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,10 @@ export default async function AnalyticsPage() {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("created_at, subscription_status, birthday, last_active_at, last_prayer_date");
+    .select("created_at, subscription_status, birthday, prayer_streak, last_active_at, last_prayer_date");
 
   const rows = profiles ?? [];
+  const rc = await getRevenueOverview();
 
   // Signups per day (last 30 days)
   const days = eachDayOfInterval({ start: since, end: new Date() });
@@ -46,11 +48,31 @@ export default async function AnalyticsPage() {
   const conversion = total ? Math.round((premium / total) * 100) : 0;
 
   // Active in last 7 days (proxy: last_active_at or last_prayer_date)
-  const sevenAgo = subDays(new Date(), 7);
-  const active7 = rows.filter((r) => {
-    const t = r.last_active_at ?? r.last_prayer_date;
-    return t && new Date(t) >= sevenAgo;
-  }).length;
+  const within = (days: number) => {
+    const cut = subDays(new Date(), days);
+    return rows.filter((r) => { const t = r.last_active_at ?? r.last_prayer_date; return t && new Date(t) >= cut; }).length;
+  };
+  const active1 = within(1);
+  const active7 = within(7);
+  const active30 = within(30);
+  const churn = planCounts["expired"] ?? 0;
+
+  // Prayer streak distribution
+  const STREAK_BUCKETS = [
+    { label: "0", min: 0, max: 0 },
+    { label: "1–3", min: 1, max: 3 },
+    { label: "4–6", min: 4, max: 6 },
+    { label: "7–13", min: 7, max: 13 },
+    { label: "14–29", min: 14, max: 29 },
+    { label: "30+", min: 30, max: 1000000 },
+  ];
+  const streakCounts: Record<string, number> = {};
+  for (const r of rows) {
+    const s = (r as any).prayer_streak ?? 0;
+    const b = STREAK_BUCKETS.find((x) => s >= x.min && s <= x.max);
+    if (b) streakCounts[b.label] = (streakCounts[b.label] ?? 0) + 1;
+  }
+  const streaks = STREAK_BUCKETS.filter((b) => streakCounts[b.label]).map((b) => ({ state: b.label, users: streakCounts[b.label] }));
 
   // Age distribution (from birthday)
   const AGE_BUCKETS: { label: string; min: number; max: number }[] = [
@@ -75,9 +97,13 @@ export default async function AnalyticsPage() {
 
   const kpis = [
     { label: "New signups (30d)", value: signups.reduce((s, d) => s + d.signups, 0), icon: TrendingUp },
-    { label: "Active users (7d)", value: active7, icon: UserCheck },
+    { label: "Daily active (24h)", value: active1, icon: UserCheck },
+    { label: "Weekly active (7d)", value: active7, icon: UserCheck },
+    { label: "Monthly active (30d)", value: active30, icon: UserCheck },
     { label: "Trial users", value: trial, icon: UserCheck },
     { label: "Trial→Paid conversion", value: `${conversion}%`, icon: TrendingUp },
+    { label: "Premium members", value: premium, icon: UserCheck },
+    { label: "Expired (churn)", value: churn, icon: TrendingUp },
   ];
 
   return (
@@ -91,6 +117,36 @@ export default async function AnalyticsPage() {
            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-card bg-ink text-white text-sm hover:opacity-90">
           Open live analytics in PostHog <ExternalLink size={15} />
         </a>
+      </div>
+
+      {/* Revenue (RevenueCat) */}
+      <div className="bg-white rounded-card p-6 border border-line shadow-card mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign size={18} className="text-brand" />
+          <h2 className="font-serif text-lg text-tone">Revenue</h2>
+          <span className="ml-auto text-xs text-tone-faint">via RevenueCat</span>
+        </div>
+        {!rc.configured ? (
+          <p className="text-sm text-tone-faint">
+            Set <code className="font-mono">REVENUECAT_API_KEY</code> (v2 secret) and <code className="font-mono">REVENUECAT_PROJECT_ID</code> in Vercel to show live MRR and subscriptions.
+          </p>
+        ) : rc.error ? (
+          <p className="text-sm text-red-600">{rc.error}</p>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { id: "mrr", label: "MRR" },
+              { id: "active_subscriptions", label: "Active subscriptions" },
+              { id: "active_trials", label: "Active trials" },
+              { id: "revenue", label: "Revenue (28d)" },
+            ].map(({ id, label }) => (
+              <div key={id}>
+                <p className="text-2xl font-serif text-tone">{formatRcMetric(rc.metrics?.[id])}</p>
+                <p className="text-tone-faint text-xs mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -120,6 +176,13 @@ export default async function AnalyticsPage() {
             <h2 className="font-serif text-lg text-tone">Age distribution</h2>
           </div>
           {ages.length ? <StateBar data={ages} /> : <p className="text-sm text-tone-faint">No birthday data yet.</p>}
+        </div>
+        <div className="bg-white rounded-card p-6 border border-line shadow-card">
+          <div className="flex items-center gap-2 mb-4">
+            <Flame size={18} className="text-brand" />
+            <h2 className="font-serif text-lg text-tone">Prayer streak distribution</h2>
+          </div>
+          {streaks.length ? <StateBar data={streaks} /> : <p className="text-sm text-tone-faint">No streak data yet.</p>}
         </div>
       </div>
     </div>
