@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { format } from "date-fns";
 import { Users, Search } from "lucide-react";
 import { zipToState, formatPhone } from "@/lib/zip";
+import { GiftProMenu } from "./GiftProMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
   let query = supabase
     .from("profiles")
     .select(
-      "id, display_name, avatar_url, phone, zip_code, prayer_streak, subscription_status, last_prayer_date, last_active_at, created_at",
+      "id, display_name, avatar_url, phone, zip_code, prayer_streak, subscription_status, comp_until, last_prayer_date, last_active_at, created_at",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -66,7 +67,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
           <table className="w-full">
             <thead className="border-b border-line">
               <tr>
-                {["Name", "Phone", "Location", "Subscription", "Streak", "Last Active", "Joined"].map((h) => (
+                {["Name", "Phone", "Location", "Subscription", "Streak", "Last Active", "Joined", "Pro Access"].map((h) => (
                   <th key={h} className="text-left px-5 py-4 text-xs font-semibold text-tone-faint uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -75,6 +76,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
               {profiles.map((u: any) => {
                 const state = zipToState(u.zip_code);
                 const lastActive = u.last_active_at ?? u.last_prayer_date;
+                const comped = !!u.comp_until && new Date(u.comp_until).getTime() > Date.now();
                 return (
                   <tr key={u.id} className="hover:bg-page transition-colors">
                     <td className="px-5 py-4">
@@ -107,6 +109,9 @@ export default async function UsersPage({ searchParams }: { searchParams: { q?: 
                     </td>
                     <td className="px-5 py-4 text-sm text-tone-faint">
                       {format(new Date(u.created_at), "MMM d, yyyy")}
+                    </td>
+                    <td className="px-5 py-4">
+                      <GiftProMenu userId={u.id} comped={comped} />
                     </td>
                   </tr>
                 );
