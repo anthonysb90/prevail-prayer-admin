@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3, ScrollText, Globe, Coins, Smartphone,
+  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3, ScrollText, Globe, Coins, Smartphone, MessageSquare,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: "/scripture", label: "Scripture", icon: Quote },
   { href: "/music", label: "Music", icon: Music2 },
   { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/versions", label: "App Versions", icon: Smartphone },
   { href: "/users", label: "Users", icon: Users },
   { href: "/site", label: "Site", icon: Globe },

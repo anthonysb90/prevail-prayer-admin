@@ -1,19 +1,21 @@
-import { getAiCostSummary, getModelPrices, formatUsd } from "@/lib/anthropicCost";
+import { getAiCostSummary, getModelPrices, getAiModelSettings, formatUsd } from "@/lib/anthropicCost";
 import { PriceEditor } from "./PriceEditor";
+import { ModelSettings } from "./ModelSettings";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AiCostsPage() {
-  const [c, prices] = await Promise.all([getAiCostSummary(), getModelPrices()]);
+  const [c, prices, models] = await Promise.all([getAiCostSummary(), getModelPrices(), getAiModelSettings()]);
 
-  const cards = [
-    { label: "Today", value: c.periods.today },
-    { label: "Last 7 days", value: c.periods.week },
-    { label: "This month", value: c.periods.month },
-    { label: "This quarter", value: c.periods.quarter },
-    { label: "This year", value: c.periods.year },
+  const periodRow = (p: typeof c.periods) => [
+    { label: "Today", value: p.today },
+    { label: "Last 7 days", value: p.week },
+    { label: "This month", value: p.month },
+    { label: "This quarter", value: p.quarter },
+    { label: "This year", value: p.year },
   ];
+  const cards = periodRow(c.periods);
   const maxDay = Math.max(0, ...c.daily.map((d) => d.amount));
 
   return (
@@ -33,13 +35,19 @@ export default async function AiCostsPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+          <div className="text-xs font-semibold text-tone-muted uppercase tracking-wide mb-2">All providers</div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
             {cards.map((card) => (
               <div key={card.label} className="rounded-card bg-page p-4">
                 <div className="text-xs text-tone-muted">{card.label}</div>
                 <div className="text-2xl font-semibold text-tone mt-1">{formatUsd(card.value)}</div>
               </div>
             ))}
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-8">
+            <ProviderCard title="Claude (Anthropic)" periods={periodRow(c.byProvider.anthropic)} />
+            <ProviderCard title="Gemini (Google)" periods={periodRow(c.byProvider.gemini)} />
           </div>
 
           <div className="rounded-card border border-line bg-white p-5 mb-6">
@@ -61,14 +69,37 @@ export default async function AiCostsPage() {
             )}
           </div>
 
+          <ModelSettings settings={models} prices={prices} />
+
           <PriceEditor prices={prices} />
 
           <p className="text-xs text-tone-muted mt-4">
-            These are estimates from token counts, typically within a cent or two of Anthropic&apos;s billed total. Cross-check
-            anytime on the Console&apos;s Cost page. (A live reconciliation to Anthropic&apos;s exact billing needs a team-org admin key.)
+            Figures are estimated from token counts at your editable per-model prices, split by provider from the model used.
+            They&apos;re typically within a cent or two of each provider&apos;s billed total — cross-check on the Anthropic Console
+            and Google Cloud Billing.
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+function ProviderCard({ title, periods }: { title: string; periods: { label: string; value: number }[] }) {
+  const total = periods.find((p) => p.label === "This year")?.value ?? 0;
+  return (
+    <div className="rounded-card border border-line bg-white p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-tone">{title}</h3>
+        <span className="text-xs text-tone-muted">{formatUsd(total)} this year</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {periods.slice(0, 3).map((p) => (
+          <div key={p.label} className="rounded-md bg-page p-3">
+            <div className="text-[11px] text-tone-muted">{p.label}</div>
+            <div className="text-lg font-semibold text-tone mt-0.5">{formatUsd(p.value)}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveModelPrice } from "./actions";
+import { useRouter } from "next/navigation";
+import { saveModelPrice, addModelPrice } from "./actions";
 import type { ModelPrice } from "@/lib/anthropicCost";
 
 interface Row extends ModelPrice {
@@ -10,12 +11,37 @@ interface Row extends ModelPrice {
 }
 
 export function PriceEditor({ prices }: { prices: ModelPrice[] }) {
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>(
     prices.map((p) => ({ ...p, draftIn: String(p.input_per_mtok), draftOut: String(p.output_per_mtok) }))
   );
   const [error, setError] = useState<string | null>(null);
   const [savedModel, setSavedModel] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [newModel, setNewModel] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [newIn, setNewIn] = useState("");
+  const [newOut, setNewOut] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const addRow = () => {
+    setAddError(null);
+    const inP = parseFloat(newIn);
+    const outP = parseFloat(newOut);
+    if (!newModel.trim()) { setAddError("Enter a model id."); return; }
+    if (isNaN(inP) || isNaN(outP)) { setAddError("Enter valid prices."); return; }
+    startTransition(async () => {
+      const res = await addModelPrice(newModel, newLabel, inP, outP);
+      if (res.error) { setAddError(res.error); return; }
+      setRows((rs) => [
+        ...rs.filter((r) => r.model !== newModel.trim()),
+        { model: newModel.trim(), label: newLabel.trim() || newModel.trim(), input_per_mtok: inP, output_per_mtok: outP, draftIn: String(inP), draftOut: String(outP) },
+      ]);
+      setNewModel(""); setNewLabel(""); setNewIn(""); setNewOut("");
+      router.refresh();
+    });
+  };
 
   const update = (model: string, field: "draftIn" | "draftOut", value: string) =>
     setRows((rs) => rs.map((r) => (r.model === model ? { ...r, [field]: value } : r)));
@@ -82,6 +108,62 @@ export function PriceEditor({ prices }: { prices: ModelPrice[] }) {
         })}
       </div>
       {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+
+      <div className="mt-5 pt-5 border-t border-line">
+        <h3 className="text-xs font-semibold text-tone mb-2">Add a model</h3>
+        <p className="text-[11px] text-tone-muted mb-3">
+          Add a new model with its price, then select it under &quot;Models in use&quot; above. Saving an existing model id updates its price.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-tone-muted">
+            Model id
+            <input
+              value={newModel}
+              onChange={(e) => setNewModel(e.target.value)}
+              placeholder="claude-haiku-5"
+              className="block w-52 mt-1 rounded-md border border-line px-2 py-1.5 text-sm text-tone font-mono focus:outline-none focus:border-brand"
+            />
+          </label>
+          <label className="text-xs text-tone-muted">
+            Label
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="Haiku 5"
+              className="block w-36 mt-1 rounded-md border border-line px-2 py-1.5 text-sm text-tone focus:outline-none focus:border-brand"
+            />
+          </label>
+          <label className="text-xs text-tone-muted">
+            Input
+            <input
+              value={newIn}
+              onChange={(e) => setNewIn(e.target.value)}
+              inputMode="decimal"
+              placeholder="1"
+              className="block w-20 mt-1 rounded-md border border-line px-2 py-1.5 text-sm text-tone focus:outline-none focus:border-brand"
+            />
+          </label>
+          <label className="text-xs text-tone-muted">
+            Output
+            <input
+              value={newOut}
+              onChange={(e) => setNewOut(e.target.value)}
+              inputMode="decimal"
+              placeholder="5"
+              className="block w-20 mt-1 rounded-md border border-line px-2 py-1.5 text-sm text-tone focus:outline-none focus:border-brand"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={addRow}
+            disabled={pending}
+            className="text-xs px-3 py-2 rounded-full border border-brand text-brand disabled:opacity-40"
+          >
+            {pending ? "Saving…" : "Add model"}
+          </button>
+        </div>
+        {addError && <p className="text-xs text-red-600 mt-3">{addError}</p>}
+      </div>
     </div>
   );
 }
