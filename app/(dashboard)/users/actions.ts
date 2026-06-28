@@ -16,7 +16,7 @@ function csvCell(v: unknown): string {
 // (Not exported: a "use server" module may only export async functions.)
 const LIFETIME_COMP = "2999-12-31T00:00:00.000Z";
 
-type GiftPlan = "month" | "year" | "lifetime" | "revoke";
+type GiftPlan = "trial" | "month" | "year" | "lifetime" | "revoke";
 
 /** Confirm the caller is a signed-in admin; returns the service-role client or an error. */
 async function requireAdmin() {
@@ -38,7 +38,8 @@ export async function setCompAccess(userId: string, plan: GiftPlan): Promise<{ e
   const admin = gate.admin!;
 
   let comp_until: string | null;
-  if (plan === "month") comp_until = new Date(Date.now() + 30 * 86400000).toISOString();
+  if (plan === "trial") comp_until = new Date(Date.now() + 14 * 86400000).toISOString();
+  else if (plan === "month") comp_until = new Date(Date.now() + 30 * 86400000).toISOString();
   else if (plan === "year") comp_until = new Date(Date.now() + 365 * 86400000).toISOString();
   else if (plan === "lifetime") comp_until = LIFETIME_COMP;
   else comp_until = null; // revoke
@@ -46,6 +47,29 @@ export async function setCompAccess(userId: string, plan: GiftPlan): Promise<{ e
   const { error } = await admin.from("profiles").update({ comp_until }).eq("id", userId);
   if (error) return { error: error.message };
   await recordAudit("gift_pro", { targetType: "user", targetId: userId, detail: { plan } });
+  revalidatePath(`/users/${userId}`);
+  revalidatePath("/users");
+  return {};
+}
+
+/**
+ * End a user's access now: clears any app-granted comp and marks the profile
+ * "expired". Note: an active App Store / RevenueCat trial or subscription is
+ * controlled by Apple/Google and can't be force-cancelled from here — this ends
+ * app-granted access and flips the in-app status flag.
+ */
+export async function endTrial(userId: string): Promise<{ error?: string }> {
+  if (!userId) return { error: "Missing user." };
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ comp_until: null, subscription_status: "expired" })
+    .eq("id", userId);
+  if (error) return { error: error.message };
+  await recordAudit("end_trial", { targetType: "user", targetId: userId });
   revalidatePath(`/users/${userId}`);
   revalidatePath("/users");
   return {};

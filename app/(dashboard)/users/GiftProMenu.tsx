@@ -2,9 +2,9 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { Gift, Check, ChevronDown } from "lucide-react";
-import { setCompAccess } from "./actions";
+import { setCompAccess, endTrial } from "./actions";
 
-type GiftPlan = "month" | "year" | "lifetime" | "revoke";
+type GiftPlan = "trial" | "month" | "year" | "lifetime" | "revoke";
 
 interface Props {
   userId: string;
@@ -39,6 +39,15 @@ export function GiftProMenu({ userId, comped }: Props) {
     });
   };
 
+  const endTrialNow = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await endTrial(userId);
+      if (res.error) setError(res.error);
+      else setOpen(false);
+    });
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -58,6 +67,9 @@ export function GiftProMenu({ userId, comped }: Props) {
 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-44 rounded-card border border-line bg-white shadow-card py-1 text-sm">
+          <button type="button" onClick={() => choose("trial")} className="w-full text-left px-3 py-2 hover:bg-page text-tone">
+            Give 14-day trial
+          </button>
           <button type="button" onClick={() => choose("month")} className="w-full text-left px-3 py-2 hover:bg-page text-tone">
             Gift 1 month
           </button>
@@ -72,6 +84,9 @@ export function GiftProMenu({ userId, comped }: Props) {
               Revoke gift
             </button>
           )}
+          <button type="button" onClick={endTrialNow} className="w-full text-left px-3 py-2 hover:bg-page text-red-600 border-t border-line" title="Clears app-granted access and marks the account expired. An active App Store trial/subscription is controlled by Apple and can't be cancelled here.">
+            End trial / access
+          </button>
         </div>
       )}
 
