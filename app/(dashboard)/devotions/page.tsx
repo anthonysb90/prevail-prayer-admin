@@ -7,21 +7,28 @@ import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-export default async function DevotionsPage({ searchParams }: { searchParams: { review?: string } }) {
+export default async function DevotionsPage({ searchParams }: { searchParams: { review?: string; status?: string } }) {
   const supabase = createAdminClient() ?? createClient();
-  const reviewOnly = searchParams?.review === "1";
+  // Backwards-compatible: ?review=1 maps to the review filter.
+  const status = searchParams?.status ?? (searchParams?.review === "1" ? "review" : "all");
 
   let q = supabase
     .from("devotions")
     .select("id, title, is_published, published_at, scheduled_for, created_at, submitted_by")
     .order("created_at", { ascending: false });
-  if (reviewOnly) q = q.not("submitted_by", "is", null).eq("is_published", false);
+  if (status === "review") q = q.not("submitted_by", "is", null).eq("is_published", false);
+  else if (status === "draft") q = q.eq("is_published", false).is("scheduled_for", null);
+  else if (status === "scheduled") q = q.eq("is_published", false).not("scheduled_for", "is", null);
+  else if (status === "published") q = q.eq("is_published", true);
   const { data } = await q;
   const devotions = data ?? [];
 
   const { count: pendingCount } = await supabase
     .from("devotions").select("id", { count: "exact", head: true })
     .not("submitted_by", "is", null).eq("is_published", false);
+  const { count: draftCount } = await supabase
+    .from("devotions").select("id", { count: "exact", head: true })
+    .eq("is_published", false).is("scheduled_for", null);
 
   return (
     <div>
@@ -30,11 +37,25 @@ export default async function DevotionsPage({ searchParams }: { searchParams: { 
           <h1 className="text-3xl font-serif text-tone">Devotions</h1>
           <p className="text-tone-faint text-sm mt-1">{devotions.length} total</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/devotions" className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${!reviewOnly ? "bg-brand-soft text-brand-deep font-semibold" : "text-tone-muted hover:bg-page"}`}>All</Link>
-          <Link href="/devotions?review=1" className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${reviewOnly ? "bg-amber-100 text-amber-700 font-semibold" : "text-tone-muted hover:bg-page"}`}>
-            Needs review{pendingCount ? ` (${pendingCount})` : ""}
-          </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {([
+            ["all", "All", undefined],
+            ["draft", "Drafts", draftCount || undefined],
+            ["scheduled", "Scheduled", undefined],
+            ["published", "Published", undefined],
+            ["review", "Needs review", pendingCount || undefined],
+          ] as const).map(([val, label, count]) => {
+            const active = status === val;
+            const href = val === "all" ? "/devotions" : `/devotions?status=${val}`;
+            const activeCls = val === "review" ? "bg-amber-100 text-amber-700 font-semibold"
+              : val === "draft" ? "bg-gray-200 text-gray-700 font-semibold"
+              : "bg-brand-soft text-brand-deep font-semibold";
+            return (
+              <Link key={val} href={href} className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${active ? activeCls : "text-tone-muted hover:bg-page"}`}>
+                {label}{count ? ` (${count})` : ""}
+              </Link>
+            );
+          })}
           <Link href="/devotions/calendar" className="text-sm px-3 py-1.5 rounded-lg text-tone-muted hover:bg-page transition-colors">Calendar</Link>
           <ImportDevotions />
           <Link
