@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, GripVertical, ImageIcon } from "lucide-react";
 import ImagePickerModal from "@/components/ui/ImagePickerModal";
-import { createClient } from "@/lib/supabase/client";
+import { saveDevotion, deleteDevotion } from "@/app/(dashboard)/devotions/actions";
 
 interface Question { id?: string; question_text: string; sort_order: number }
 
@@ -58,10 +58,14 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
       alert("Title and body are required.");
       return;
     }
+    if (pubMode === "schedule" && (!scheduleAt || isNaN(new Date(scheduleAt).getTime()))) {
+      alert("Please choose a date and time to schedule this devotion.");
+      return;
+    }
     setSaving(true);
-    const supabase = createClient();
 
-    const devotionData = {
+    const res = await saveDevotion({
+      id: initial.id,
       title: title.trim(),
       image_url: imageUrl.trim() || null,
       scripture_reference: scriptureRef.trim() || null,
@@ -71,30 +75,9 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
       is_published: pubMode === "now",
       published_at: pubMode === "now" ? new Date().toISOString() : null,
       scheduled_for: pubMode === "schedule" ? new Date(scheduleAt).toISOString() : null,
-    };
-    if (pubMode === "schedule" && (!scheduleAt || isNaN(new Date(scheduleAt).getTime()))) {
-      alert("Please choose a date and time to schedule this devotion.");
-      return;
-    }
-
-    let devotionId = initial.id;
-
-    if (isEdit) {
-      const { error } = await supabase.from("devotions").update(devotionData).eq("id", devotionId!);
-      if (error) { alert(error.message); setSaving(false); return; }
-      await supabase.from("devotion_questions").delete().eq("devotion_id", devotionId!);
-    } else {
-      const { data, error } = await supabase.from("devotions").insert(devotionData).select().single();
-      if (error) { alert(error.message); setSaving(false); return; }
-      devotionId = data.id;
-    }
-
-    const validQuestions = questions.filter((q) => q.question_text.trim());
-    if (validQuestions.length > 0) {
-      await supabase.from("devotion_questions").insert(
-        validQuestions.map((q, i) => ({ devotion_id: devotionId!, question_text: q.question_text.trim(), sort_order: i }))
-      );
-    }
+      questions: questions.map((q) => q.question_text),
+    });
+    if (res.error) { alert(res.error); setSaving(false); return; }
 
     router.push("/devotions");
     router.refresh();
@@ -102,8 +85,8 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
 
   const handleDelete = async () => {
     if (!confirm("Delete this devotion? This cannot be undone.")) return;
-    const supabase = createClient();
-    await supabase.from("devotions").delete().eq("id", initial.id!);
+    const res = await deleteDevotion(initial.id!);
+    if (res.error) { alert(res.error); return; }
     router.push("/devotions");
     router.refresh();
   };

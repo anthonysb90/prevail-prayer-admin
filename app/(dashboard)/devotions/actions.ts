@@ -32,6 +32,65 @@ export async function deleteDevotions(ids: string[]): Promise<{ error?: string; 
   return { deleted: clean.length };
 }
 
+export interface DevotionInput {
+  id?: string;
+  title: string;
+  image_url: string | null;
+  scripture_reference: string | null;
+  scripture_text: string | null;
+  body: string;
+  closing_prayer: string | null;
+  is_published: boolean;
+  published_at: string | null;
+  scheduled_for: string | null;
+  questions: string[];
+}
+
+/** Create or update a devotion (and its reflection questions) via the service key. */
+export async function saveDevotion(input: DevotionInput): Promise<{ error?: string; id?: string }> {
+  if (!input.title?.trim() || !input.body?.trim()) return { error: "Title and body are required." };
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
+
+  const row = {
+    title: input.title.trim(),
+    image_url: input.image_url,
+    scripture_reference: input.scripture_reference,
+    scripture_text: input.scripture_text,
+    body: input.body.trim(),
+    closing_prayer: input.closing_prayer,
+    is_published: input.is_published,
+    published_at: input.published_at,
+    scheduled_for: input.scheduled_for,
+  };
+
+  let id = input.id;
+  if (id) {
+    const { error } = await admin.from("devotions").update(row).eq("id", id);
+    if (error) return { error: error.message };
+  } else {
+    const { data, error } = await admin.from("devotions").insert(row).select("id").single();
+    if (error || !data) return { error: error?.message ?? "Insert failed." };
+    id = data.id as string;
+  }
+
+  await admin.from("devotion_questions").delete().eq("devotion_id", id);
+  const qs = (input.questions ?? []).map((q) => q.trim()).filter(Boolean);
+  if (qs.length) {
+    await admin.from("devotion_questions").insert(qs.map((q, i) => ({ devotion_id: id, question_text: q, sort_order: i })));
+  }
+
+  await recordAudit(input.id ? "edit_devotion" : "create_devotion", { targetType: "devotions", targetId: id });
+  revalidatePath("/devotions");
+  return { id };
+}
+
+/** Delete a single devotion. */
+export async function deleteDevotion(id: string): Promise<{ error?: string }> {
+  return deleteDevotions([id]);
+}
+
 /** Delete every draft (unpublished, unscheduled) devotion. */
 export async function deleteAllDrafts(): Promise<{ error?: string; deleted?: number }> {
   const gate = await requireAdmin();
