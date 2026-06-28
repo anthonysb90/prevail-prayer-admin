@@ -1,118 +1,73 @@
-/**
- * Anthropic AI cost tracking for the admin "AI Costs" page.
- *
- * Requires (set in Vercel, mark the key Sensitive):
- *   ANTHROPIC_ADMIN_KEY     Admin API key (sk-ant-admin01-...) — Console → Settings → Admin keys
- *   ANTHROPIC_WORKSPACE_ID  (optional) the workspace the Prevail Prayer key lives in
- *                           (wrkspc_...). When set, only that workspace's spend is counted,
- *                           so other things on your account are excluded. If omitted, all
- *                           workspaces are summed.
- *
- * Uses the Cost Report API (/v1/organizations/cost_report), grouped by workspace,
- * daily buckets. Amounts come back as decimal strings in cents.
- */
+import { createAdminClient } from "@/lib/supabase/admin";
 
-interface CostResult {
-  amount?: string | number;
-  currency?: string;
-  workspace_id?: string | null;
-}
-interface CostBucket {
-  starting_at?: string;
-  results?: CostResult[];
-}
-interface CostResponse {
-  data?: CostBucket[];
-  has_more?: boolean;
-  next_page?: string | null;
-}
+/**
+ * Self-tracked AI cost for the admin "AI Costs" page. The import edge function
+ * logs each call's tokens + computed cost into ai_cost_log (priced from the
+ * editable ai_model_prices table). No Anthropic admin key required.
+ */
 
 export interface AiCostSummary {
   configured: boolean;
-  error?: string;
-  workspaceScoped: boolean;
   periods: { today: number; week: number; month: number; quarter: number; year: number };
-  daily: { date: string; amount: number }[]; // current-month days, dollars
+  daily: { date: string; amount: number }[];
+}
+
+export interface ModelPrice {
+  model: string;
+  label: string | null;
+  input_per_mtok: number;
+  output_per_mtok: number;
 }
 
 const EMPTY = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
 
 export async function getAiCostSummary(): Promise<AiCostSummary> {
-  const key = process.env.ANTHROPIC_ADMIN_KEY;
-  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID || null;
-  if (!key) return { configured: false, workspaceScoped: false, periods: EMPTY, daily: [] };
+  const admin = createAdminClient();
+  if (!admin) return { configured: false, periods: EMPTY, daily: [] };
+
+  const since = new Date(Date.now() - 372 * 86400000).toISOString();
+  const { data } = await admin.from("ai_cost_log").select("cost_usd, created_at").gte("created_at", since);
 
   const now = new Date();
-  const start = new Date(now.getTime() - 372 * 86400000);
-  const startISO = `${start.toISOString().slice(0, 10)}T00:00:00Z`;
-  const endISO = `${new Date(now.getTime() + 86400000).toISOString().slice(0, 10)}T00:00:00Z`;
-
-  const centsByDay = new Map<string, number>();
-  try {
-    let page: string | null = null;
-    for (let i = 0; i < 20; i++) {
-      const params = new URLSearchParams({ starting_at: startISO, ending_at: endISO, bucket_width: "1d", limit: "31" });
-      params.append("group_by[]", "workspace_id");
-      if (page) params.set("page", page);
-
-      const res = await fetch(`https://api.anthropic.com/v1/organizations/cost_report?${params.toString()}`, {
-        headers: { "anthropic-version": "2023-06-01", "x-api-key": key },
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        const detail = res.status === 401 ? " Check the Admin API key." : "";
-        return { configured: true, workspaceScoped: !!workspaceId, error: `Anthropic cost API error (${res.status}).${detail}`, periods: EMPTY, daily: [] };
-      }
-      const json = (await res.json()) as CostResponse;
-      for (const bucket of json.data ?? []) {
-        const day = (bucket.starting_at ?? "").slice(0, 10);
-        if (!day) continue;
-        for (const r of bucket.results ?? []) {
-          if (workspaceId && (r.workspace_id ?? null) !== workspaceId) continue;
-          const cents = typeof r.amount === "string" ? parseFloat(r.amount) : Number(r.amount ?? 0);
-          if (!isNaN(cents)) centsByDay.set(day, (centsByDay.get(day) ?? 0) + cents);
-        }
-      }
-      if (!json.has_more || !json.next_page) break;
-      page = json.next_page;
-    }
-  } catch (e: unknown) {
-    return { configured: true, workspaceScoped: !!workspaceId, error: e instanceof Error ? e.message : "Failed to reach Anthropic.", periods: EMPTY, daily: [] };
-  }
-
   const todayStr = now.toISOString().slice(0, 10);
   const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-  const q = Math.floor(m / 3);
+  const mo = now.getUTCMonth();
+  const q = Math.floor(mo / 3);
   const weekAgo = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
 
-  const periodsCents = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
-  const daily: { date: string; amount: number }[] = [];
-  for (const [day, cents] of Array.from(centsByDay.entries())) {
+  const p = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
+  const byDay = new Map<string, number>();
+  for (const row of data ?? []) {
+    const day = String((row as { created_at: string }).created_at).slice(0, 10);
+    const cost = Number((row as { cost_usd: string | number }).cost_usd) || 0;
     const d = new Date(`${day}T00:00:00Z`);
-    if (day === todayStr) periodsCents.today += cents;
-    if (day >= weekAgo) periodsCents.week += cents;
-    if (d.getUTCFullYear() === y && d.getUTCMonth() === m) {
-      periodsCents.month += cents;
-      daily.push({ date: day, amount: cents / 100 });
+    if (day === todayStr) p.today += cost;
+    if (day >= weekAgo) p.week += cost;
+    if (d.getUTCFullYear() === y && d.getUTCMonth() === mo) {
+      p.month += cost;
+      byDay.set(day, (byDay.get(day) ?? 0) + cost);
     }
-    if (d.getUTCFullYear() === y && Math.floor(d.getUTCMonth() / 3) === q) periodsCents.quarter += cents;
-    if (d.getUTCFullYear() === y) periodsCents.year += cents;
+    if (d.getUTCFullYear() === y && Math.floor(d.getUTCMonth() / 3) === q) p.quarter += cost;
+    if (d.getUTCFullYear() === y) p.year += cost;
   }
-  daily.sort((a, b) => a.date.localeCompare(b.date));
 
-  return {
-    configured: true,
-    workspaceScoped: !!workspaceId,
-    periods: {
-      today: periodsCents.today / 100,
-      week: periodsCents.week / 100,
-      month: periodsCents.month / 100,
-      quarter: periodsCents.quarter / 100,
-      year: periodsCents.year / 100,
-    },
-    daily,
-  };
+  const daily = Array.from(byDay.entries())
+    .map(([date, amount]) => ({ date, amount }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { configured: true, periods: p, daily };
+}
+
+export async function getModelPrices(): Promise<ModelPrice[]> {
+  const admin = createAdminClient();
+  if (!admin) return [];
+  const { data } = await admin.from("ai_model_prices").select("model, label, input_per_mtok, output_per_mtok").order("model");
+  return (data ?? []).map((r: ModelPrice) => ({
+    model: r.model,
+    label: r.label,
+    input_per_mtok: Number(r.input_per_mtok),
+    output_per_mtok: Number(r.output_per_mtok),
+  }));
 }
 
 export function formatUsd(n: number): string {
