@@ -37,7 +37,7 @@ export default function DraftsManager({ rows }: { rows: DraftRow[] }) {
   };
 
   const deleteSelected = () =>
-    run(() => deleteDevotions([...selected]), `Permanently delete ${selected.size} draft${selected.size === 1 ? "" : "s"}? This can't be undone.`);
+    run(() => deleteDevotions(Array.from(selected)), `Permanently delete ${selected.size} draft${selected.size === 1 ? "" : "s"}? This can't be undone.`);
   const deleteEvery = () =>
     run(() => deleteAllDrafts(), `Permanently delete ALL ${rows.length} drafts? This can't be undone.`);
 
