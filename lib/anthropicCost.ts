@@ -88,7 +88,7 @@ export async function getAiCostSummary(): Promise<AiCostSummary> {
 
   const periodsCents = { today: 0, week: 0, month: 0, quarter: 0, year: 0 };
   const daily: { date: string; amount: number }[] = [];
-  for (const [day, cents] of centsByDay) {
+  for (const [day, cents] of Array.from(centsByDay.entries())) {
     const d = new Date(`${day}T00:00:00Z`);
     if (day === todayStr) periodsCents.today += cents;
     if (day >= weekAgo) periodsCents.week += cents;
