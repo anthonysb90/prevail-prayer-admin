@@ -126,5 +126,10 @@ export function providerForModel(model: string): "anthropic" | "gemini" {
 }
 
 export function formatUsd(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+  // Sub-cent precision for small amounts so low usage isn't hidden as $0.00.
+  const maxFrac = n !== 0 && Math.abs(n) < 1 ? 4 : 2;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency", currency: "USD",
+    minimumFractionDigits: 2, maximumFractionDigits: maxFrac,
+  }).format(n);
 }
