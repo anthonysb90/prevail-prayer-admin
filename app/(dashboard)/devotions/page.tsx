@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Plus, Pencil } from "lucide-react";
 import ImportDevotions from "@/components/ui/ImportDevotions";
+import DraftsManager from "@/components/ui/DraftsManager";
 import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,9 @@ export default async function DevotionsPage({ searchParams }: { searchParams: { 
         </div>
       </div>
 
+      {status === "draft" ? (
+        <DraftsManager rows={devotions.map((d) => ({ id: d.id, title: d.title }))} />
+      ) : (
       <div className="bg-white rounded-card shadow-card overflow-hidden">
         {devotions.length === 0 ? (
           <div className="text-center py-16 text-tone-faint">No devotions yet. Create your first one.</div>
@@ -118,6 +122,7 @@ export default async function DevotionsPage({ searchParams }: { searchParams: { 
           </table>
         )}
       </div>
+      )}
     </div>
   );
 }
