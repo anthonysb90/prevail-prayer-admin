@@ -10,6 +10,7 @@ export const SEGMENTS: { value: string; label: string; description: string }[] =
   { value: "inactive14", label: "Lapsed (14d+)", description: "No activity in 14+ days" },
   { value: "streak7", label: "Streak ≥ 7", description: "On a 7-day+ prayer streak" },
   { value: "birthday_month", label: "Birthday this month", description: "Birthday falls in the current month" },
+  { value: "premium_unused", label: "Hasn't explored premium", description: "Has premium access (Pro, gifted, or trial) but hasn't opened a devotion, journaled, saved Scripture, or used the timer" },
 ];
 
 export interface NotifData {
@@ -28,6 +29,7 @@ interface AudienceRow {
   lastActive: number | null; // epoch ms
   streak: number;
   birthdayMonth: number | null; // 1-12
+  usedPremium: boolean; // has touched any premium feature
 }
 
 export interface Audience {
@@ -38,10 +40,22 @@ export interface Audience {
 /** Load all profiles (segment criteria) + push tokens, via the service-role client. */
 export async function loadAudience(admin: SupabaseClient): Promise<Audience> {
   const now = Date.now();
-  const [{ data: profiles }, { data: tokens }] = await Promise.all([
+  const [{ data: profiles }, { data: tokens }, ...featureSets] = await Promise.all([
     admin.from("profiles").select("id, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, birthday"),
     admin.from("user_push_tokens").select("user_id, expo_push_token"),
+    admin.from("devotion_responses").select("user_id"),
+    admin.from("journal_entries").select("user_id"),
+    admin.from("user_favorite_verses").select("user_id"),
+    admin.from("prayer_sessions").select("user_id"),
   ]);
+
+  // Anyone who appears in any premium-feature table has "explored" premium.
+  const usedPremiumIds = new Set<string>();
+  for (const set of featureSets) {
+    for (const r of (set?.data ?? []) as { user_id: string | null }[]) {
+      if (r.user_id) usedPremiumIds.add(r.user_id);
+    }
+  }
 
   const rows: AudienceRow[] = (profiles ?? []).map((p: any) => {
     const la = p.last_active_at ?? p.last_prayer_date;
@@ -53,6 +67,7 @@ export async function loadAudience(admin: SupabaseClient): Promise<Audience> {
       lastActive: la ? new Date(la).getTime() : null,
       streak: p.prayer_streak ?? 0,
       birthdayMonth: bd && !isNaN(bd.getTime()) ? bd.getMonth() + 1 : null,
+      usedPremium: usedPremiumIds.has(p.id),
     };
   });
 
@@ -82,6 +97,7 @@ export function segmentMatch(row: AudienceRow, segment: string): boolean {
     case "inactive14": return row.lastActive == null || now - row.lastActive > 14 * DAY;
     case "streak7": return row.streak >= 7;
     case "birthday_month": return row.birthdayMonth === new Date().getMonth() + 1;
+    case "premium_unused": return (premium || row.status === "trial") && !row.usedPremium;
     default: return false;
   }
 }
@@ -116,10 +132,10 @@ export function segmentCounts(aud: Audience): Record<string, number> {
 }
 
 /** Send an Expo push to a list of tokens, batched. Returns count delivered to Expo. */
-export async function sendExpoPush(tokens: string[], title: string, body: string, type: string): Promise<number> {
+export async function sendExpoPush(tokens: string[], title: string, body: string, type: string, screen?: string): Promise<number> {
   const list = tokens.filter(Boolean);
   if (list.length === 0) return 0;
-  const messages = list.map((to) => ({ to, title, body, data: { screen: "/notifications", type }, sound: "default" }));
+  const messages = list.map((to) => ({ to, title, body, data: { screen: screen || "/notifications", type }, sound: "default" }));
   let sent = 0;
   for (let i = 0; i < messages.length; i += 100) {
     const batch = messages.slice(i, i + 100);

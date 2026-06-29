@@ -40,8 +40,8 @@ function validate(title: string, body: string, segment: string): string | null {
   return null;
 }
 
-/** Send a push to a segment now. */
-export async function sendToSegment(title: string, body: string, type: string, segment: string): Promise<{ sent?: number; error?: string }> {
+/** Send a push to a segment now. `screen` deep-links the tap (e.g. "/devotions", "upgrade"). */
+export async function sendToSegment(title: string, body: string, type: string, segment: string, screen?: string): Promise<{ sent?: number; error?: string }> {
   const gate = await requireAdmin();
   if (gate.error) return { error: gate.error };
   const admin = gate.admin!;
@@ -50,18 +50,18 @@ export async function sendToSegment(title: string, body: string, type: string, s
 
   const aud = await loadAudience(admin);
   const tokens = segmentTokens(aud, segment);
-  const sent = await sendExpoPush(tokens, title.trim(), body.trim(), type);
+  const sent = await sendExpoPush(tokens, title.trim(), body.trim(), type, screen);
 
   await admin.from("notification_log").insert({ title: title.trim(), body: body.trim(), segment, sent_count: sent, sent_by: gate.actorId });
   // Keep the legacy announcements feed populated too.
   await admin.from("announcements").insert({ title: title.trim(), body: body.trim(), type, sent_at: new Date().toISOString() }).then(() => {}, () => {});
-  await recordAudit("send_push", { detail: { segment, sent } });
+  await recordAudit("send_push", { detail: { segment, sent, screen: screen ?? null } });
 
   return { sent };
 }
 
 /** Schedule a push to a segment for later (sent by the scheduled-notifications cron). */
-export async function scheduleToSegment(title: string, body: string, type: string, segment: string, sendAtISO: string): Promise<{ ok?: boolean; error?: string }> {
+export async function scheduleToSegment(title: string, body: string, type: string, segment: string, sendAtISO: string, screen?: string): Promise<{ ok?: boolean; error?: string }> {
   const gate = await requireAdmin();
   if (gate.error) return { error: gate.error };
   const admin = gate.admin!;
@@ -72,10 +72,10 @@ export async function scheduleToSegment(title: string, body: string, type: strin
   if (when.getTime() < Date.now() + 60000) return { error: "Choose a time at least a minute from now." };
 
   const { error } = await admin.from("scheduled_notifications").insert({
-    title: title.trim(), body: body.trim(), segment, send_at: when.toISOString(), status: "pending", created_by: gate.actorId,
+    title: title.trim(), body: body.trim(), segment, send_at: when.toISOString(), status: "pending", created_by: gate.actorId, screen: screen || null,
   });
   if (error) return { error: error.message };
-  await recordAudit("schedule_push", { detail: { segment, send_at: when.toISOString() } });
+  await recordAudit("schedule_push", { detail: { segment, send_at: when.toISOString(), screen: screen ?? null } });
   return { ok: true };
 }
 

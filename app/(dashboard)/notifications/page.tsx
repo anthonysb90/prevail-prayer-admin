@@ -27,6 +27,7 @@ export default function NotificationsPage() {
   const [body, setBody] = useState("");
   const [type, setType] = useState<NotifType>("info");
   const [segment, setSegment] = useState("all");
+  const [dest, setDest] = useState("");
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [scheduleAt, setScheduleAt] = useState(defaultSchedule());
   const [busy, setBusy] = useState(false);
@@ -44,11 +45,11 @@ export default function NotificationsPage() {
     setBusy(true); setMsg(null);
     (async () => {
       if (mode === "now") {
-        const res = await sendToSegment(title, body, type, segment);
+        const res = await sendToSegment(title, body, type, segment, dest || undefined);
         if (res.error) setMsg({ kind: "err", text: res.error });
         else { setMsg({ kind: "ok", text: `Sent to ${res.sent ?? 0} device${res.sent === 1 ? "" : "s"}.` }); setTitle(""); setBody(""); refresh(); }
       } else {
-        const res = await scheduleToSegment(title, body, type, segment, new Date(scheduleAt).toISOString());
+        const res = await scheduleToSegment(title, body, type, segment, new Date(scheduleAt).toISOString(), dest || undefined);
         if (res.error) setMsg({ kind: "err", text: res.error });
         else { setMsg({ kind: "ok", text: "Scheduled." }); setTitle(""); setBody(""); refresh(); }
       }
@@ -101,6 +102,16 @@ export default function NotificationsPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-tone-faint mb-2 uppercase tracking-wide">When tapped, open</label>
+            <select value={dest} onChange={(e) => setDest(e.target.value)} className={inputClass}>
+              <option value="">Just open the app</option>
+              <option value="/devotions">Today&apos;s Devotion</option>
+              <option value="upgrade">Upgrade screen (paywall)</option>
+            </select>
+            <p className="text-xs text-tone-faint mt-1">Deep links require the app build that ships your next update.</p>
           </div>
 
           <div>
