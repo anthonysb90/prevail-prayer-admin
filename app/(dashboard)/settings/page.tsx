@@ -25,10 +25,10 @@ export default function SettingsPage() {
             </div>
             <h2 className="font-serif text-lg text-tone">Membership & Paywall</h2>
           </div>
-          <Row label="Premium price" value="$14.99 / year" />
+          <Row label="Premium price" value="$2.99/mo · $24.99/yr · $49.99 lifetime" />
           <Row label="Free trial" value="14 days" />
           <Row label="Free tier" value="Prayer requests, list & home" />
-          <Row label="Premium unlocks" value="Journal, Timer, Scripture, Reminders, Devotions" last />
+          <Row label="Premium unlocks" value="Devotions, Timer, Journal, Scripture, Reminders, Face ID" last />
           <p className="text-xs text-tone-faint mt-4 leading-relaxed">
             Pricing and billing are managed in App Store Connect and RevenueCat. Changes there flow to the app automatically.
           </p>

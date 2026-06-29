@@ -34,3 +34,15 @@ export async function updateFeedbackStatus(id: string, status: string): Promise<
   revalidatePath("/feedback");
   return {};
 }
+
+export async function deleteFeedback(id: string): Promise<{ error?: string }> {
+  if (!id) return { error: "Missing id." };
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+
+  const { error } = await gate.admin!.from("app_feedback").delete().eq("id", id);
+  if (error) return { error: error.message };
+  await recordAudit("delete_feedback", { targetType: "app_feedback", targetId: id });
+  revalidatePath("/feedback");
+  return {};
+}

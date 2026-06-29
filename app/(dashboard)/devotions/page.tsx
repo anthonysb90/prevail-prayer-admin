@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, UserPlus } from "lucide-react";
 import ImportDevotions from "@/components/ui/ImportDevotions";
 import DraftsManager from "@/components/ui/DraftsManager";
 import { format } from "date-fns";
@@ -58,6 +58,9 @@ export default async function DevotionsPage({ searchParams }: { searchParams: { 
             );
           })}
           <Link href="/devotions/calendar" className="text-sm px-3 py-1.5 rounded-lg text-tone-muted hover:bg-page transition-colors">Calendar</Link>
+          <Link href="/settings#submissions" className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-tone-muted hover:bg-page transition-colors" title="Share a link so others can submit devotions">
+            <UserPlus size={15} /> Invite a writer
+          </Link>
           <ImportDevotions />
           <Link
             href="/devotions/new"

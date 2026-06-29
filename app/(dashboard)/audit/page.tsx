@@ -7,11 +7,23 @@ export const dynamic = "force-dynamic";
 
 const ACTION_LABELS: Record<string, string> = {
   gift_pro: "Gifted Pro",
+  end_trial: "Ended trial",
   edit_user: "Edited user",
   send_password_reset: "Sent password reset",
   set_temp_password: "Set temp password",
   delete_user: "Deleted user",
   set_contributor_password: "Changed contributor password",
+  create_devotion: "Created devotion",
+  edit_devotion: "Edited devotion",
+  delete_devotions: "Deleted devotions",
+  delete_all_drafts: "Deleted all drafts",
+  update_feedback_status: "Updated feedback",
+  delete_feedback: "Deleted feedback",
+  edit_ai_models: "Changed AI models",
+  edit_site_content: "Edited site content",
+  send_push: "Sent push",
+  schedule_push: "Scheduled push",
+  cancel_scheduled_push: "Canceled scheduled push",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -21,7 +33,8 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default async function AuditPage() {
-  const supabase = createAdminClient() ?? createClient();
+  const admin = createAdminClient();
+  const supabase = admin ?? createClient();
   const { data } = await supabase
     .from("admin_audit_log")
     .select("id, actor_email, action, target_type, target_id, detail, created_at")
@@ -36,6 +49,12 @@ export default async function AuditPage() {
         <p className="text-tone-faint text-sm mt-1">A record of sensitive admin actions</p>
       </div>
 
+      {!admin && (
+        <div className="mb-4 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          The service role key isn&apos;t configured here, so the log can&apos;t be read. Add
+          <span className="font-mono"> SUPABASE_SERVICE_ROLE_KEY </span> in Vercel and redeploy.
+        </div>
+      )}
       <div className="bg-white rounded-card shadow-card overflow-hidden">
         {rows.length === 0 ? (
           <div className="text-center py-16 text-tone-faint">

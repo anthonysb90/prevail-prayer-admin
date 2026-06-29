@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { SITE_DEFAULTS } from "@/lib/siteDefaults";
 import { SiteContentEditor } from "./SiteContentEditor";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function SitePage() {
   const blocks = PAGES.map((p) => ({
     ...p,
     body: (map.get(p.slug)?.body as string) ?? "",
+    defaultBody: SITE_DEFAULTS[p.slug] ?? "",
     updatedAt: (map.get(p.slug)?.updated_at as string) ?? null,
   }));
 
@@ -27,8 +29,8 @@ export default async function SitePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-tone">Site Content</h1>
         <p className="text-sm text-tone-muted mt-1">
-          Edit the public marketing pages in Markdown. Changes go live on the site immediately — no redeploy.
-          Leave a page blank to keep its built-in default text.
+          Edit the public marketing pages in Markdown. Privacy and Terms load with their current published
+          text so you can edit in place. Changes go live on the site immediately — no redeploy.
         </p>
       </div>
       <SiteContentEditor blocks={blocks} />

@@ -9,6 +9,7 @@ interface Block {
   label: string;
   path: string;
   body: string;
+  defaultBody: string;
   updatedAt: string | null;
 }
 
@@ -45,12 +46,12 @@ function mdToHtml(src: string): string {
 
 export function SiteContentEditor({ blocks }: { blocks: Block[] }) {
   const [active, setActive] = useState(blocks[0]?.slug ?? "");
-  const [drafts, setDrafts] = useState<Record<string, string>>(
-    Object.fromEntries(blocks.map((b) => [b.slug, b.body]))
-  );
-  const [saved, setSaved] = useState<Record<string, string>>(
-    Object.fromEntries(blocks.map((b) => [b.slug, b.body]))
-  );
+  // When a page has no saved override yet, preload its current published text so
+  // the admin edits real copy instead of a blank box.
+  const initial = Object.fromEntries(blocks.map((b) => [b.slug, b.body || b.defaultBody]));
+  const [drafts, setDrafts] = useState<Record<string, string>>(initial);
+  const [saved, setSaved] = useState<Record<string, string>>(initial);
+  const usingDefault = (b: Block) => !b.body && !!b.defaultBody;
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -95,9 +96,11 @@ export function SiteContentEditor({ blocks }: { blocks: Block[] }) {
         >
           View live page <ExternalLink size={12} />
         </a>
-        {block.updatedAt && (
+        {block.updatedAt ? (
           <span className="text-xs text-tone-muted">Last saved {new Date(block.updatedAt).toLocaleDateString()}</span>
-        )}
+        ) : usingDefault(block) ? (
+          <span className="text-xs text-tone-muted">Showing current published text — edit and save to manage it here</span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

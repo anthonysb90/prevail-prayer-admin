@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
-import { loadAudience, segmentCounts, segmentTokens, sendExpoPush, SEGMENTS, type NotifData } from "@/lib/notify";
+import { loadAudience, segmentCounts, segmentTokens, sendExpoPush, reachStats, SEGMENTS, type NotifData } from "@/lib/notify";
 
 async function requireAdmin() {
   const supabase = createClient();
@@ -19,18 +19,19 @@ async function requireAdmin() {
 /** Initial data for the notifications page: segment counts, history, scheduled. */
 export async function getNotifData(): Promise<NotifData> {
   const gate = await requireAdmin();
-  if (gate.error) return { counts: {}, history: [], scheduled: [], error: gate.error };
+  if (gate.error) return { counts: {}, totalUsers: 0, reachableUsers: 0, history: [], scheduled: [], error: gate.error };
   const admin = gate.admin!;
 
   const aud = await loadAudience(admin);
   const counts = segmentCounts(aud);
+  const { totalUsers, reachableUsers } = reachStats(aud);
 
   const [{ data: history }, { data: scheduled }] = await Promise.all([
     admin.from("notification_log").select("id, title, body, segment, sent_count, created_at").order("created_at", { ascending: false }).limit(30),
     admin.from("scheduled_notifications").select("id, title, body, segment, send_at").eq("status", "pending").order("send_at", { ascending: true }),
   ]);
 
-  return { counts, history: history ?? [], scheduled: scheduled ?? [] };
+  return { counts, totalUsers, reachableUsers, history: history ?? [], scheduled: scheduled ?? [] };
 }
 
 function validate(title: string, body: string, segment: string): string | null {

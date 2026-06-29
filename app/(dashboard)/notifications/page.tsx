@@ -30,7 +30,7 @@ export default function NotificationsPage() {
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [scheduleAt, setScheduleAt] = useState(defaultSchedule());
   const [busy, setBusy] = useState(false);
-  const [data, setData] = useState<NotifData>({ counts: {}, history: [], scheduled: [] });
+  const [data, setData] = useState<NotifData>({ counts: {}, totalUsers: 0, reachableUsers: 0, history: [], scheduled: [] });
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const refresh = () => getNotifData().then(setData);
@@ -62,7 +62,12 @@ export default function NotificationsPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-serif text-tone">Push Notifications</h1>
-        <p className="text-tone-faint text-sm mt-1">{(data.counts.all ?? 0).toLocaleString()} reachable devices</p>
+        <p className="text-tone-faint text-sm mt-1">
+          {data.reachableUsers} of {data.totalUsers} users reachable
+          {data.totalUsers > data.reachableUsers
+            ? ` — ${data.totalUsers - data.reachableUsers} haven't turned on notifications`
+            : ""}
+        </p>
       </div>
 
       {msg && (

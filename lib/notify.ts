@@ -14,6 +14,8 @@ export const SEGMENTS: { value: string; label: string; description: string }[] =
 
 export interface NotifData {
   counts: Record<string, number>;
+  totalUsers: number;
+  reachableUsers: number;
   history: { id: string; title: string; body: string | null; segment: string | null; sent_count: number; created_at: string }[];
   scheduled: { id: string; title: string; body: string | null; segment: string; send_at: string }[];
   error?: string;
@@ -93,6 +95,13 @@ export function segmentTokens(aud: Audience, segment: string): string[] {
     if (t) out.push(...t);
   }
   return out;
+}
+
+/** Total users, and how many are reachable (have at least one push token). */
+export function reachStats(aud: Audience): { totalUsers: number; reachableUsers: number } {
+  let reachableUsers = 0;
+  for (const row of aud.rows) if (aud.tokensByUser.has(row.id)) reachableUsers++;
+  return { totalUsers: aud.rows.length, reachableUsers };
 }
 
 /** Recipient (distinct user) count per segment — only users who have a token. */

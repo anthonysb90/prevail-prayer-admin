@@ -40,7 +40,7 @@ export default function ContributorPasswordCard() {
     "No password set yet — set one to enable the page";
 
   return (
-    <div className="bg-white rounded-card p-6 border border-line shadow-card">
+    <div id="submissions" className="bg-white rounded-card p-6 border border-line shadow-card scroll-mt-24">
       <div className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
           <PenLine size={20} />

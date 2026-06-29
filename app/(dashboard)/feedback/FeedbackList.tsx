@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateFeedbackStatus } from "./actions";
+import { Trash2 } from "lucide-react";
+import { updateFeedbackStatus, deleteFeedback } from "./actions";
 
 export interface FeedbackRow {
   id: string;
@@ -50,6 +51,16 @@ export function FeedbackList({ initialRows }: { initialRows: FeedbackRow[] }) {
     });
   };
 
+  const remove = (id: string) => {
+    if (!confirm("Delete this feedback permanently? This can't be undone.")) return;
+    setPendingId(id);
+    startTransition(async () => {
+      const res = await deleteFeedback(id);
+      if (!res.error) setRows((rs) => rs.filter((r) => r.id !== id));
+      setPendingId(null);
+    });
+  };
+
   return (
     <div>
       <div className="flex flex-wrap gap-3 mb-5">
@@ -72,7 +83,13 @@ export function FeedbackList({ initialRows }: { initialRows: FeedbackRow[] }) {
                     {STATUS_LABEL[r.status] ?? r.status}
                   </span>
                 </div>
-                <span className="text-xs text-tone-muted shrink-0">{new Date(r.created_at).toLocaleString()}</span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-tone-muted">{new Date(r.created_at).toLocaleString()}</span>
+                  <button type="button" onClick={() => remove(r.id)} disabled={pendingId === r.id} title="Delete"
+                    className="text-tone-faint hover:text-red-600 disabled:opacity-40 transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
 
               <p className="text-sm text-tone mt-3 whitespace-pre-wrap">{r.message}</p>
