@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, GripVertical, ImageIcon } from "lucide-react";
+import { Plus, Trash2, GripVertical, ImageIcon, Sparkles, CalendarPlus } from "lucide-react";
 import ImagePickerModal from "@/components/ui/ImagePickerModal";
-import { saveDevotion, deleteDevotion } from "@/app/(dashboard)/devotions/actions";
+import { saveDevotion, deleteDevotion, generateDevotion, getNextAvailableDate } from "@/app/(dashboard)/devotions/actions";
 
 interface Question { id?: string; question_text: string; sort_order: number }
 
@@ -47,6 +47,46 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
   const [questions, setQuestions] = useState<Question[]>(
     initial.questions ?? [{ question_text: "", sort_order: 0 }]
   );
+
+  // AI assist
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [nextBusy, setNextBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const handleGenerate = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiBusy(true);
+    setAiMsg(null);
+    const res = await generateDevotion(aiPrompt);
+    setAiBusy(false);
+    if (res.error || !res.devotion) {
+      setAiMsg({ kind: "err", text: res.error ?? "Generation failed." });
+      return;
+    }
+    const d = res.devotion;
+    setTitle(d.title);
+    setScriptureRef(d.scripture_reference);
+    setScriptureText(d.scripture_text);
+    setBody(d.body);
+    setPrayer(d.closing_prayer);
+    if (d.questions.length) {
+      setQuestions(d.questions.map((q, i) => ({ question_text: q, sort_order: i })));
+    }
+    setAiMsg({ kind: "ok", text: "Draft written below. Review and edit before saving." });
+  };
+
+  const handleNextAvailable = async () => {
+    setNextBusy(true);
+    const res = await getNextAvailableDate();
+    setNextBusy(false);
+    if (res.error || !res.date) {
+      setAiMsg({ kind: "err", text: res.error ?? "Couldn't find an open date." });
+      return;
+    }
+    setPubMode("schedule");
+    setScheduleAt(`${res.date}T07:00`);
+  };
 
   const addQuestion = () => setQuestions((q) => [...q, { question_text: "", sort_order: q.length }]);
   const removeQuestion = (i: number) => setQuestions((q) => q.filter((_, idx) => idx !== i));
@@ -113,6 +153,38 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
       </div>
 
       <div className="space-y-6">
+        {/* AI assist */}
+        <div className="bg-brand-soft/50 border border-brand/30 rounded-card p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={18} className="text-brand" />
+            <p className="font-semibold text-tone text-sm">Write with AI</p>
+          </div>
+          <p className="text-xs text-tone-muted mb-3">
+            Give a topic, a Bible verse, or any idea. The AI drafts a devotion in your published style — then you review and edit.
+          </p>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            rows={2}
+            placeholder='e.g. "Trusting God in seasons of waiting" or "Philippians 4:6-7" or "a devotion about gratitude"'
+            className="w-full bg-white border border-line rounded-xl px-4 py-3 text-tone focus:outline-none focus:ring-2 focus:ring-brand text-sm"
+          />
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={aiBusy || !aiPrompt.trim()}
+              className="inline-flex items-center gap-2 bg-brand hover:bg-brand-deep text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50"
+            >
+              <Sparkles size={15} /> {aiBusy ? "Writing…" : "Write devotion"}
+            </button>
+            {aiMsg && (
+              <span className={`text-xs ${aiMsg.kind === "ok" ? "text-green-700" : "text-red-600"}`}>{aiMsg.text}</span>
+            )}
+          </div>
+          <p className="text-[11px] text-tone-faint mt-2">Uses the text model set in AI Settings; cost is logged under AI Costs (mode: devotion).</p>
+        </div>
+
         {/* Publish / schedule */}
         <div className="bg-white rounded-card p-5 shadow-card">
           <p className="font-semibold text-tone text-sm mb-3">Publishing</p>
@@ -134,6 +206,17 @@ export default function DevotionForm({ initial = {} }: DevotionFormProps) {
                 <span className="block text-xs text-tone-faint mt-0.5">{hint}</span>
               </button>
             ))}
+          </div>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={handleNextAvailable}
+              disabled={nextBusy}
+              className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl border border-brand/40 text-brand-deep hover:bg-brand-soft disabled:opacity-50 transition-colors"
+            >
+              <CalendarPlus size={15} /> {nextBusy ? "Finding date…" : "Publish on next available date"}
+            </button>
+            <p className="text-xs text-tone-faint mt-1.5">Schedules this devotion for the earliest day with no other devotion (fills gaps), at 7:00 AM. Review the date below, then Save.</p>
           </div>
           {pubMode === "schedule" && (
             <div className="mt-4">

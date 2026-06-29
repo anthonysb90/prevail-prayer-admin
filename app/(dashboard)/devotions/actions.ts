@@ -91,6 +91,71 @@ export async function deleteDevotion(id: string): Promise<{ error?: string }> {
   return deleteDevotions([id]);
 }
 
+export interface GeneratedDevotion {
+  title: string;
+  scripture_reference: string;
+  scripture_text: string;
+  body: string;
+  closing_prayer: string;
+  questions: string[];
+}
+
+/** Ask the generate-devotion edge function to draft a devotion from a prompt,
+ *  using already-published devotions as style examples. */
+export async function generateDevotion(prompt: string): Promise<{ error?: string; devotion?: GeneratedDevotion }> {
+  if (!prompt?.trim()) return { error: "Enter a topic, verse, or idea." };
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { error: "Supabase isn't configured for AI generation." };
+
+  try {
+    const res = await fetch(`${url}/functions/v1/generate-devotion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ prompt: prompt.trim() }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: (j && j.error) || `Generator returned ${res.status}.` };
+    const d = j.devotion;
+    if (!d || !d.title || !d.body) return { error: "The AI didn't return a usable devotion. Try again." };
+    return {
+      devotion: {
+        title: String(d.title ?? ""),
+        scripture_reference: String(d.scripture_reference ?? ""),
+        scripture_text: String(d.scripture_text ?? ""),
+        body: String(d.body ?? ""),
+        closing_prayer: String(d.closing_prayer ?? ""),
+        questions: Array.isArray(d.questions) ? d.questions.map((q: unknown) => String(q)).filter(Boolean) : [],
+      },
+    };
+  } catch {
+    return { error: "Couldn't reach the AI generator." };
+  }
+}
+
+/** Find the earliest date (from today, UTC) with no published or scheduled devotion. */
+export async function getNextAvailableDate(): Promise<{ error?: string; date?: string }> {
+  const gate = await requireAdmin();
+  if (gate.error) return { error: gate.error };
+
+  const { data } = await gate.admin!.from("devotions").select("published_at, scheduled_for");
+  const taken = new Set<string>();
+  for (const d of (data ?? []) as { published_at: string | null; scheduled_for: string | null }[]) {
+    const iso = d.scheduled_for ?? d.published_at;
+    if (iso) taken.add(iso.slice(0, 10));
+  }
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  for (let i = 0; i < 800; i++) {
+    const key = new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10);
+    if (!taken.has(key)) return { date: key };
+  }
+  return { error: "No open date found in the next two years." };
+}
+
 /** Delete every draft (unpublished, unscheduled) devotion. */
 export async function deleteAllDrafts(): Promise<{ error?: string; deleted?: number }> {
   const gate = await requireAdmin();
