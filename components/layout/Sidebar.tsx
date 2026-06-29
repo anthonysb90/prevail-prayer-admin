@@ -3,13 +3,14 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3, ScrollText, Globe, Coins, Smartphone, MessageSquare,
+  LayoutGrid, BookOpen, Quote, Music2, Bell, Users, LogOut, Settings, BarChart3, ScrollText, Globe, Coins, Smartphone, MessageSquare, Activity,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/engagement", label: "Engagement", icon: Activity },
   { href: "/ai-costs", label: "AI Costs", icon: Coins },
   { href: "/devotions", label: "Devotions", icon: BookOpen },
   { href: "/scripture", label: "Scripture", icon: Quote },
