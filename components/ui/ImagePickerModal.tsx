@@ -18,9 +18,13 @@ type SourceFilter = "both" | "unsplash" | "pexels";
 export default function ImagePickerModal({
   onSelect,
   onClose,
+  contribPassword,
 }: {
   onSelect: (url: string) => void;
   onClose: () => void;
+  /** Passed on the public contribute page so the image API can authorize the
+   *  request without an admin session. Admins omit it (their cookie is used). */
+  contribPassword?: string;
 }) {
   const [q, setQ] = useState("");
   const [source, setSource] = useState<SourceFilter>("both");
@@ -35,7 +39,9 @@ export default function ImagePickerModal({
     setError(null);
     setSearched(true);
     try {
-      const res = await fetch(`/api/images/search?q=${encodeURIComponent(q)}&source=${source}`);
+      const res = await fetch(`/api/images/search?q=${encodeURIComponent(q)}&source=${source}`, {
+        headers: contribPassword ? { "x-contrib-pass": contribPassword } : undefined,
+      });
       const data = await res.json();
       setImages(data.images ?? []);
       if (data.error) setError(data.error);
@@ -50,7 +56,10 @@ export default function ImagePickerModal({
     if (img.source === "unsplash" && img.downloadLocation) {
       fetch("/api/images/track", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(contribPassword ? { "x-contrib-pass": contribPassword } : {}),
+        },
         body: JSON.stringify({ downloadLocation: img.downloadLocation }),
       }).catch(() => {});
     }

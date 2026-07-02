@@ -111,7 +111,7 @@ export default function ContributeForm() {
 
   return (
     <div className="space-y-6">
-      {showPicker && <ImagePickerModal onSelect={(url) => setImageUrl(url)} onClose={() => setShowPicker(false)} />}
+      {showPicker && <ImagePickerModal contribPassword={password} onSelect={(url) => setImageUrl(url)} onClose={() => setShowPicker(false)} />}
 
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</div>}
 

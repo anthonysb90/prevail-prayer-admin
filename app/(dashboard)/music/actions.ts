@@ -1,40 +1,28 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { requireEditor } from "@/lib/authz";
+import { recordAudit } from "@/lib/audit";
+import { ensurePublicBucket } from "@/lib/storage";
 import { revalidatePath } from "next/cache";
 
 const BUCKET = "music";
 const MAX_BYTES = 30 * 1024 * 1024; // 30 MB
 const ALLOWED = ["audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a", "audio/aac", "audio/wav", "audio/x-wav"];
 
-/** Confirm the caller is a signed-in admin; returns an error string if not. */
-async function requireAdmin(): Promise<{ error?: string }> {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { error: "Not signed in." };
-  const { data: me } = await supabase.from("profiles").select("is_admin").eq("id", auth.user.id).single();
-  if (!me?.is_admin) return { error: "Admins only." };
-  return {};
-}
-
 /** Read every track (incl. hidden) via service role for the admin list. */
 export async function listTracks() {
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error, tracks: [] as any[] };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured.", tracks: [] as any[] };
-  const { data, error } = await admin.from("music_tracks").select("*").order("sort_order");
+  const { data, error } = await gate.admin!.from("music_tracks").select("*").order("sort_order");
   if (error) return { error: error.message, tracks: [] as any[] };
   return { tracks: data ?? [] };
 }
 
 /** Upload an audio file straight to storage and create the track row. */
 export async function uploadTrack(formData: FormData): Promise<{ error?: string }> {
-  const gate = await requireAdmin();
-  if (gate.error) return gate;
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." };
+  const gate = await requireEditor();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
 
   const title = String(formData.get("title") ?? "").trim();
   const artist = String(formData.get("artist") ?? "").trim();
@@ -44,8 +32,7 @@ export async function uploadTrack(formData: FormData): Promise<{ error?: string 
   if (file.size > MAX_BYTES) return { error: "File is larger than 30 MB." };
   if (file.type && !ALLOWED.includes(file.type)) return { error: `Unsupported audio type: ${file.type}` };
 
-  // Make sure the bucket exists (first upload creates it).
-  await admin.storage.createBucket(BUCKET, { public: true }).catch(() => {});
+  await ensurePublicBucket(admin, BUCKET);
 
   const safe = (file.name || "track.mp3").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-60);
   const path = `tracks/${Date.now()}-${safe}`;
@@ -77,41 +64,39 @@ export async function uploadTrack(formData: FormData): Promise<{ error?: string 
     return { error: error.message };
   }
 
+  await recordAudit("upload_track", { targetType: "music_tracks", detail: { title } });
   revalidatePath("/music");
   return {};
 }
 
 /** Rename a track's title / artist. */
 export async function renameTrack(id: string, title: string, artist: string): Promise<{ error?: string }> {
-  const gate = await requireAdmin();
-  if (gate.error) return gate;
+  const gate = await requireEditor();
+  if (gate.error) return { error: gate.error };
   if (!id || !title.trim()) return { error: "Title is required." };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." };
-  const { error } = await admin.from("music_tracks").update({ title: title.trim(), artist: artist.trim() || null }).eq("id", id);
+  const { error } = await gate.admin!.from("music_tracks").update({ title: title.trim(), artist: artist.trim() || null }).eq("id", id);
   if (error) return { error: error.message };
+  await recordAudit("rename_track", { targetType: "music_tracks", targetId: id });
   revalidatePath("/music");
   return {};
 }
 
 /** Show / hide a track in the app. */
 export async function setTrackAvailable(id: string, available: boolean): Promise<{ error?: string }> {
-  const gate = await requireAdmin();
-  if (gate.error) return gate;
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." };
-  const { error } = await admin.from("music_tracks").update({ is_available: available }).eq("id", id);
+  const gate = await requireEditor();
+  if (gate.error) return { error: gate.error };
+  const { error } = await gate.admin!.from("music_tracks").update({ is_available: available }).eq("id", id);
   if (error) return { error: error.message };
+  await recordAudit("set_track_available", { targetType: "music_tracks", targetId: id, detail: { available } });
   revalidatePath("/music");
   return {};
 }
 
 /** Delete a track row and its uploaded storage object (if any). */
 export async function deleteTrack(id: string): Promise<{ error?: string }> {
-  const gate = await requireAdmin();
-  if (gate.error) return gate;
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." };
+  const gate = await requireEditor();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
 
   const { data: row } = await admin.from("music_tracks").select("file_url, is_bundled").eq("id", id).single();
 
@@ -128,6 +113,7 @@ export async function deleteTrack(id: string): Promise<{ error?: string }> {
     }
   }
 
+  await recordAudit("delete_track", { targetType: "music_tracks", targetId: id });
   revalidatePath("/music");
   return {};
 }

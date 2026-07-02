@@ -4,6 +4,7 @@ import { subDays, format, eachDayOfInterval } from "date-fns";
 import { SignupsLine, PlanPie, StateBar } from "@/components/ui/AnalyticsCharts";
 import { ageFromBirthday } from "@/lib/age";
 import { getRevenueOverview, formatRcMetric } from "@/lib/revenuecat";
+import { fetchAllRows } from "@/lib/paginate";
 import { ExternalLink, TrendingUp, UserCheck, Cake, Flame, DollarSign } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +15,12 @@ export default async function AnalyticsPage() {
   const supabase = createAdminClient() ?? createClient();
   const since = subDays(new Date(), 29);
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("created_at, subscription_status, birthday, prayer_streak, last_active_at, last_prayer_date");
-
-  const rows = profiles ?? [];
+  // Page through every profile (PostgREST caps a single query at 1,000 rows).
+  const rows = await fetchAllRows<any>(
+    supabase,
+    "profiles",
+    "created_at, subscription_status, birthday, prayer_streak, last_active_at, last_prayer_date",
+  );
   const rc = await getRevenueOverview();
 
   // Signups per day (last 30 days)

@@ -1,21 +1,9 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
+import { requireAdmin } from "@/lib/authz";
 import { providerForModel } from "@/lib/anthropicCost";
 import { revalidatePath } from "next/cache";
-
-async function requireAdmin() {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { error: "Not signed in." as string };
-  const { data: me } = await supabase.from("profiles").select("is_admin, admin_role").eq("id", auth.user.id).single();
-  if (!me?.is_admin || me.admin_role === "editor") return { error: "Admins only." as string };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." as string };
-  return { admin };
-}
 
 export async function saveModelPrice(model: string, inputPerMtok: number, outputPerMtok: number): Promise<{ error?: string }> {
   if (!model) return { error: "Missing model." };

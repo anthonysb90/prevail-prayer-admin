@@ -1,15 +1,17 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/paginate";
 import { EngagementTable, type EngagementRow } from "./EngagementTable";
 
 export const dynamic = "force-dynamic";
 
-/** Tally rows-per-user for a table that has a `user_id` column. */
+/** Tally rows-per-user for a table that has a `user_id` column. Pages through
+ *  all rows so counts stay correct past 1,000 users. */
 async function countByUser(admin: ReturnType<typeof createAdminClient>, table: string): Promise<Map<string, number>> {
   const m = new Map<string, number>();
   if (!admin) return m;
-  const { data } = await admin.from(table).select("user_id");
-  for (const r of (data ?? []) as { user_id: string | null }[]) {
+  const rows = await fetchAllRows<{ user_id: string | null }>(admin, table, "user_id");
+  for (const r of rows) {
     if (r.user_id) m.set(r.user_id, (m.get(r.user_id) ?? 0) + 1);
   }
   return m;
@@ -19,9 +21,11 @@ export default async function EngagementPage() {
   const admin = createAdminClient();
   const supabase = admin ?? createClient();
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, display_name, phone, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, created_at");
+  const profiles = await fetchAllRows<any>(
+    supabase,
+    "profiles",
+    "id, display_name, phone, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, created_at",
+  );
 
   // One query per feature table; tally per user in memory.
   const [prayers, journals, devotions, scriptures, sessions] = await Promise.all([
@@ -39,8 +43,12 @@ export default async function EngagementPage() {
   // Push reachability.
   const pushOn = new Set<string>();
   if (admin) {
-    const { data: tokens } = await admin.from("user_push_tokens").select("user_id, expo_push_token");
-    for (const t of (tokens ?? []) as { user_id: string | null; expo_push_token: string | null }[]) {
+    const tokens = await fetchAllRows<{ user_id: string | null; expo_push_token: string | null }>(
+      admin,
+      "user_push_tokens",
+      "user_id, expo_push_token",
+    );
+    for (const t of tokens) {
       if (t.user_id && t.expo_push_token) pushOn.add(t.user_id);
     }
   }

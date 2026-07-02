@@ -1,26 +1,15 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
+import { requireEditor } from "@/lib/authz";
+import type { DevotionRow } from "@/lib/csv";
 import { revalidatePath } from "next/cache";
-
-async function requireAdmin() {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { error: "Not signed in." as string };
-  const { data: me } = await supabase.from("profiles").select("is_admin, admin_role").eq("id", auth.user.id).single();
-  if (!me?.is_admin || me.admin_role === "editor") return { error: "Admins only." as string };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." as string };
-  return { admin };
-}
 
 /** Permanently delete one or more devotions (and their reflection questions). */
 export async function deleteDevotions(ids: string[]): Promise<{ error?: string; deleted?: number }> {
   const clean = (ids ?? []).filter(Boolean);
   if (clean.length === 0) return { error: "Nothing selected." };
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error };
 
   await gate.admin!.from("devotion_questions").delete().in("devotion_id", clean);
@@ -49,7 +38,7 @@ export interface DevotionInput {
 /** Create or update a devotion (and its reflection questions) via the service key. */
 export async function saveDevotion(input: DevotionInput): Promise<{ error?: string; id?: string }> {
   if (!input.title?.trim() || !input.body?.trim()) return { error: "Title and body are required." };
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error };
   const admin = gate.admin!;
 
@@ -91,6 +80,62 @@ export async function deleteDevotion(id: string): Promise<{ error?: string }> {
   return deleteDevotions([id]);
 }
 
+// publish_date: "" or invalid -> draft; <= today (UTC) -> publish now; future -> scheduled.
+function classifyPublishDate(dateStr: string): { kind: "now" | "scheduled" | "draft"; iso: string | null } {
+  if (!dateStr) return { kind: "draft", iso: null };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { kind: "draft", iso: null };
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  return d.getTime() <= today.getTime() ? { kind: "now", iso: d.toISOString() } : { kind: "scheduled", iso: d.toISOString() };
+}
+
+/** Bulk-import devotions (and reflection questions) from a parsed CSV. */
+export async function importDevotions(items: DevotionRow[]): Promise<{ imported?: number; error?: string }> {
+  const gate = await requireEditor();
+  if (gate.error) return { error: gate.error };
+  const admin = gate.admin!;
+
+  const clean = (items ?? []).filter((it) => it.title?.trim() && it.body?.trim());
+  if (clean.length === 0) return { error: "No valid rows to import (title and body are required)." };
+
+  const payload = clean.map((it) => {
+    const c = classifyPublishDate(it.publish_date);
+    return {
+      title: it.title.trim(),
+      image_url: it.image_url?.trim() || null,
+      scripture_reference: it.scripture_reference?.trim() || null,
+      scripture_text: it.scripture_text?.trim() || null,
+      body: it.body.trim(),
+      closing_prayer: it.closing_prayer?.trim() || null,
+      is_published: c.kind === "now",
+      published_at: c.kind === "now" ? c.iso : null,
+      scheduled_for: c.kind === "scheduled" ? c.iso : null,
+    };
+  });
+
+  const { data, error } = await admin.from("devotions").insert(payload).select("id");
+  if (error || !data) return { error: error?.message ?? "Import failed." };
+
+  // Reflection questions (pipe-separated), matched to inserted rows by index.
+  const questions: { devotion_id: string; question_text: string; sort_order: number }[] = [];
+  data.forEach((row: { id: string }, i: number) => {
+    const raw = clean[i].reflection_questions;
+    if (!raw) return;
+    raw.split("|").map((q) => q.trim()).filter(Boolean).forEach((q, qi) => {
+      questions.push({ devotion_id: row.id, question_text: q, sort_order: qi });
+    });
+  });
+  if (questions.length) {
+    const { error: qErr } = await admin.from("devotion_questions").insert(questions);
+    if (qErr) return { imported: data.length, error: `Devotions imported, but questions failed: ${qErr.message}` };
+  }
+
+  await recordAudit("import_devotions", { targetType: "devotions", detail: { count: data.length } });
+  revalidatePath("/devotions");
+  return { imported: data.length };
+}
+
 export interface GeneratedDevotion {
   title: string;
   scripture_reference: string;
@@ -104,7 +149,7 @@ export interface GeneratedDevotion {
  *  using already-published devotions as style examples. */
 export async function generateDevotion(prompt: string): Promise<{ error?: string; devotion?: GeneratedDevotion }> {
   if (!prompt?.trim()) return { error: "Enter a topic, verse, or idea." };
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -138,7 +183,7 @@ export async function generateDevotion(prompt: string): Promise<{ error?: string
 
 /** Find the earliest date (from today, UTC) with no published or scheduled devotion. */
 export async function getNextAvailableDate(): Promise<{ error?: string; date?: string }> {
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error };
 
   const { data } = await gate.admin!.from("devotions").select("published_at, scheduled_for");
@@ -158,7 +203,7 @@ export async function getNextAvailableDate(): Promise<{ error?: string; date?: s
 
 /** Delete every draft (unpublished, unscheduled) devotion. */
 export async function deleteAllDrafts(): Promise<{ error?: string; deleted?: number }> {
-  const gate = await requireAdmin();
+  const gate = await requireEditor();
   if (gate.error) return { error: gate.error };
 
   const { data: rows } = await gate.admin!

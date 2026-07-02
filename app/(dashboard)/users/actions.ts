@@ -1,9 +1,8 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
 import { ageFromBirthday } from "@/lib/age";
+import { requireAdmin } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
 
 function csvCell(v: unknown): string {
@@ -17,18 +16,6 @@ function csvCell(v: unknown): string {
 const LIFETIME_COMP = "2999-12-31T00:00:00.000Z";
 
 type GiftPlan = "trial" | "month" | "year" | "lifetime" | "revoke";
-
-/** Confirm the caller is a signed-in admin; returns the service-role client or an error. */
-async function requireAdmin() {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { error: "Not signed in." as string };
-  const { data: me } = await supabase.from("profiles").select("is_admin, admin_role").eq("id", auth.user.id).single();
-  if (!me?.is_admin || me.admin_role === "editor") return { error: "Admins only." as string };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." as string };
-  return { admin };
-}
 
 /** Gift (or revoke) Pro access by setting profiles.comp_until. */
 export async function setCompAccess(userId: string, plan: GiftPlan): Promise<{ error?: string }> {

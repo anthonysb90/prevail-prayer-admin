@@ -1,44 +1,50 @@
 "use server";
 
-import { createHash, timingSafeEqual } from "crypto";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkContributorPassword, storedPasswordHash } from "@/lib/contributorAuth";
+import { ensurePublicBucket } from "@/lib/storage";
 
 function clientIp(): string {
   const h = headers();
   return (h.get("x-forwarded-for")?.split(",")[0]?.trim()) || h.get("x-real-ip") || "unknown";
 }
 
-const PW_KEY = "devotion_submit_password_sha256";
+// Local alias so existing call sites read the same.
+const checkPassword = checkContributorPassword;
 
-function sha256(s: string): string {
-  return createHash("sha256").update(s, "utf8").digest("hex");
-}
-
-/** Current contributor-password hash: the admin-set value in app_settings,
- *  falling back to the DEVOTION_SUBMIT_PASSWORD env var if no value is set. */
-async function storedPasswordHash(): Promise<string | null> {
+/** Count recent contribute attempts (password checks + submissions) from an IP,
+ *  used to throttle both brute-force guessing and submission floods. */
+async function recentAttempts(ip: string, windowMs: number): Promise<number> {
   const admin = createAdminClient();
-  if (admin) {
-    const { data } = await admin.from("app_settings").select("value").eq("key", PW_KEY).maybeSingle();
-    if (data?.value) return data.value as string;
-  }
-  const env = process.env.DEVOTION_SUBMIT_PASSWORD;
-  return env ? sha256(env) : null;
+  if (!admin) return 0;
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { count } = await admin
+    .from("contribute_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("ip", ip)
+    .gte("created_at", since);
+  return count ?? 0;
 }
 
-async function checkPassword(input: string): Promise<boolean> {
-  const stored = await storedPasswordHash();
-  if (!stored || !input) return false;
-  const a = Buffer.from(sha256(input), "hex");
-  const b = Buffer.from(stored, "hex");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+async function logAttempt(ip: string): Promise<void> {
+  const admin = createAdminClient();
+  if (!admin) return;
+  await admin.from("contribute_attempts").insert({ ip }).then(() => {}, () => {});
 }
 
-/** Phase 1: check the shared password before revealing the form. */
+/** Phase 1: check the shared password before revealing the form.
+ *  Rate-limited per IP so the shared password can't be brute-forced. */
 export async function verifyContributorPassword(password: string): Promise<{ ok?: boolean; error?: string }> {
   if (!(await storedPasswordHash())) return { error: "Submissions are not enabled yet." };
+
+  const ip = clientIp();
+  // Max 10 password attempts per 10 minutes per IP.
+  if ((await recentAttempts(ip, 600_000)) >= 10) {
+    return { error: "Too many attempts. Please wait a few minutes and try again." };
+  }
+  await logAttempt(ip);
+
   if (!(await checkPassword(password))) return { error: "Incorrect password." };
   return { ok: true };
 }
@@ -71,7 +77,7 @@ export async function uploadDevotionImage(
   const admin = createAdminClient();
   if (!admin) return { error: "Uploads are temporarily unavailable." };
 
-  await admin.storage.createBucket(IMAGE_BUCKET, { public: true }).catch(() => {});
+  await ensurePublicBucket(admin, IMAGE_BUCKET);
   const safe = (file.name || "image.jpg").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-60);
   const path = `submissions/${Date.now()}-${safe}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -105,10 +111,10 @@ export async function submitDevotion(
 
   // Rate-limit by IP in case the link leaks (max 15 submissions / hour).
   const ip = clientIp();
-  const since = new Date(Date.now() - 3600_000).toISOString();
-  const { count } = await admin.from("contribute_attempts").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", since);
-  if ((count ?? 0) >= 15) return { error: "Too many submissions from your network. Please try again later." };
-  await admin.from("contribute_attempts").insert({ ip }).then(() => {}, () => {});
+  if ((await recentAttempts(ip, 3600_000)) >= 15) {
+    return { error: "Too many submissions from your network. Please try again later." };
+  }
+  await logAttempt(ip);
 
   const { data, error } = await admin
     .from("devotions")

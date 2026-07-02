@@ -2,8 +2,8 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, X, FileText, Loader2, CalendarClock, CheckCircle2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { parseCSV, rowsToDevotions, DevotionRow } from "@/lib/csv";
+import { importDevotions } from "@/app/(dashboard)/devotions/actions";
 
 function startOfToday() {
   const d = new Date();
@@ -43,41 +43,10 @@ export default function ImportDevotions() {
   const runImport = async () => {
     setImporting(true);
     setError(null);
-    const supabase = createClient();
-
-    const payload = items.map((it) => {
-      const c = classify(it.publish_date);
-      return {
-        title: it.title,
-        image_url: it.image_url || null,
-        scripture_reference: it.scripture_reference || null,
-        scripture_text: it.scripture_text || null,
-        body: it.body,
-        closing_prayer: it.closing_prayer || null,
-        is_published: c.kind === "now",
-        published_at: c.kind === "now" ? c.iso : null,
-        scheduled_for: c.kind === "scheduled" ? c.iso : null,
-      };
-    });
-
-    const { data, error } = await supabase.from("devotions").insert(payload).select("id");
-    if (error || !data) { setError(error?.message ?? "Insert failed."); setImporting(false); return; }
-
-    // Reflection questions (pipe-separated), matched to inserted rows by index.
-    const questions: { devotion_id: string; question_text: string; sort_order: number }[] = [];
-    data.forEach((row: { id: string }, i: number) => {
-      const raw = items[i].reflection_questions;
-      if (!raw) return;
-      raw.split("|").map((q) => q.trim()).filter(Boolean).forEach((q, qi) => {
-        questions.push({ devotion_id: row.id, question_text: q, sort_order: qi });
-      });
-    });
-    if (questions.length) {
-      const { error: qErr } = await supabase.from("devotion_questions").insert(questions);
-      if (qErr) { setError(`Devotions imported, but questions failed: ${qErr.message}`); }
-    }
-
-    setDoneCount(data.length);
+    const res = await importDevotions(items);
+    if (res.error && res.imported == null) { setError(res.error); setImporting(false); return; }
+    if (res.error) setError(res.error); // partial success (questions failed)
+    setDoneCount(res.imported ?? items.length);
     setImporting(false);
     router.refresh();
   };

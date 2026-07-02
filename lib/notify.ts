@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllRows } from "@/lib/paginate";
 
 /** Audience segments the admin can target. */
 export const SEGMENTS: { value: string; label: string; description: string }[] = [
@@ -40,19 +41,21 @@ export interface Audience {
 /** Load all profiles (segment criteria) + push tokens, via the service-role client. */
 export async function loadAudience(admin: SupabaseClient): Promise<Audience> {
   const now = Date.now();
-  const [{ data: profiles }, { data: tokens }, ...featureSets] = await Promise.all([
-    admin.from("profiles").select("id, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, birthday"),
-    admin.from("user_push_tokens").select("user_id, expo_push_token"),
-    admin.from("devotion_responses").select("user_id"),
-    admin.from("journal_entries").select("user_id"),
-    admin.from("user_favorite_verses").select("user_id"),
-    admin.from("prayer_sessions").select("user_id"),
+  // Page through every row — PostgREST caps a single query at 1,000 rows, which
+  // would silently exclude users past that line from every segment.
+  const [profiles, tokens, ...featureSets] = await Promise.all([
+    fetchAllRows<any>(admin, "profiles", "id, subscription_status, comp_until, prayer_streak, last_active_at, last_prayer_date, birthday"),
+    fetchAllRows<{ user_id: string; expo_push_token: string | null }>(admin, "user_push_tokens", "user_id, expo_push_token"),
+    fetchAllRows<{ user_id: string | null }>(admin, "devotion_responses", "user_id"),
+    fetchAllRows<{ user_id: string | null }>(admin, "journal_entries", "user_id"),
+    fetchAllRows<{ user_id: string | null }>(admin, "user_favorite_verses", "user_id"),
+    fetchAllRows<{ user_id: string | null }>(admin, "prayer_sessions", "user_id"),
   ]);
 
   // Anyone who appears in any premium-feature table has "explored" premium.
   const usedPremiumIds = new Set<string>();
   for (const set of featureSets) {
-    for (const r of (set?.data ?? []) as { user_id: string | null }[]) {
+    for (const r of set) {
       if (r.user_id) usedPremiumIds.add(r.user_id);
     }
   }

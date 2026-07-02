@@ -1,22 +1,8 @@
 "use server";
 
-import { createHash } from "crypto";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { recordAudit } from "@/lib/audit";
-
-const PW_KEY = "devotion_submit_password_sha256";
-
-async function requireAdmin() {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { error: "Not signed in." as string };
-  const { data: me } = await supabase.from("profiles").select("is_admin, admin_role").eq("id", auth.user.id).single();
-  if (!me?.is_admin || me.admin_role === "editor") return { error: "Admins only." as string };
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured." as string };
-  return { admin };
-}
+import { requireAdmin } from "@/lib/authz";
+import { PW_KEY, sha256 } from "@/lib/contributorAuth";
 
 /** Whether a contributor password is currently set (admin value or env fallback). */
 export async function getContributorPasswordStatus(): Promise<{ set: boolean; source: "admin" | "env" | "none"; error?: string }> {
@@ -34,7 +20,7 @@ export async function setContributorPassword(password: string): Promise<{ ok?: b
   if (gate.error) return { error: gate.error };
   if (!password || password.length < 6) return { error: "Use at least 6 characters." };
 
-  const value = createHash("sha256").update(password, "utf8").digest("hex");
+  const value = sha256(password);
   const { error } = await gate.admin!
     .from("app_settings")
     .upsert({ key: PW_KEY, value, updated_at: new Date().toISOString() }, { onConflict: "key" });

@@ -1,8 +1,8 @@
 "use client";
 import { useState, useRef } from "react";
 import { Upload, X, FileText, Loader2, CheckCircle2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { parseCSV, rowsToScriptures, ScriptureRow } from "@/lib/csv";
+import { importVerses } from "@/app/(dashboard)/scripture/actions";
 
 export default function ImportScriptures({ onImported }: { onImported?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -25,16 +25,9 @@ export default function ImportScriptures({ onImported }: { onImported?: () => vo
 
   const run = async () => {
     setImporting(true); setError(null);
-    const supabase = createClient();
-    // sort_order: sequential within each topic, appended after existing
-    const byTopic: Record<string, number> = {};
-    const payload = items.map((it) => {
-      const n = byTopic[it.topic] ?? 0; byTopic[it.topic] = n + 1;
-      return { reference: it.reference, verse_text: it.verse_text, topic: it.topic, is_featured: it.is_featured, sort_order: n };
-    });
-    const { data, error } = await supabase.from("scripture_verses").insert(payload).select("id");
-    if (error) { setError(error.message); setImporting(false); return; }
-    setDone(data?.length ?? items.length); setImporting(false); onImported?.();
+    const res = await importVerses(items);
+    if (res.error) { setError(res.error); setImporting(false); return; }
+    setDone(res.imported ?? items.length); setImporting(false); onImported?.();
   };
 
   const topics = Array.from(new Set(items.map((i) => i.topic)));
